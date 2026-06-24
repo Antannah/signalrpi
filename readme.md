@@ -254,6 +254,28 @@ Die beiden CC1101-Module werden direkt über den SPI0-Bus an den Pico W angeschl
 3.  **End-to-End-Test:**
     Der Pico W verbindet sich autonom mit dem WLAN und sendet JSON-Telegramme an den MQTT-Broker. Zur Live-Validierung der MQTT-Payloads wird die Verwendung von **MQTT Explorer** auf dem PC empfohlen.
 
+### 6.4 Konfiguration des 868 MHz-Empfängers
+
+Da im 868 MHz-Band sowohl FSK-modulierte Sensoren (z. B. modernere Fine Offset/Ecowitt-Sensoren) als auch ASK/OOK-modulierte Sensoren (z. B. ältere FS20- oder MAX!-Komponenten) arbeiten, kann der Betriebsmodus für den zweiten CC1101-Transceiver in der Datei [config_local.py](file:///c:/Users/Norma/Documents/antigravity/signalrpi/src/config_local.py) konfiguriert werden:
+
+```python
+# CC1101 868 MHz Betriebsmodus
+# - "FSK" : (Standard) Nutzt den CC1101-Hardware-Packet-Handler zur robusten Erfassung
+#           und Filterung von FSK-Paketen (z. B. WH51, WH40).
+# - "OOK" : Schaltet den Transceiver in den asynchronen Modus (Flankenerkennung per PIO),
+#           um rohe ASK/OOK-Pulsfolgen wie bei 433 MHz zu erfassen.
+MODE_868 = "FSK"
+```
+
+*   **Verhalten bei `"FSK"`:**
+    *   Der CC1101 filtert das Signal hardwareseitig auf das Sync-Word `0x2DD4`.
+    *   Valide Pakete werden per SPI-FIFO gelesen und an [decode_fsk_packet](file:///c:/Users/Norma/Documents/antigravity/signalrpi/src/decoders/__init__.py#L32) übergeben.
+    *   Es wird keine PIO-State-Machine für diesen Empfänger belegt (Ressourceneinsparung auf dem RP2040).
+*   **Verhalten bei `"OOK"`:**
+    *   Der CC1101 leitet das unstrukturierte Basisbandsignal an Pin GP21 weiter.
+    *   Die **PIO State Machine 1** wird gestartet, um die Impuls- und Pausendauern zu messen.
+    *   Die resultierenden Pulsfolgen werden an [decode_signal](file:///c:/Users/Norma/Documents/antigravity/signalrpi/src/decoders/__init__.py#L46) (identisch zum 433 MHz-Pfad) übergeben.
+
 ---
 
 ## 7. Decoder-Spezifikation & Unterstützte Protokolle
