@@ -213,3 +213,44 @@ graph TD
 - [ ] Auswahl der primären Zielprotokolle (z. B. welche Sensoren/Aktoren aktiv im Einsatz sind).
 - [ ] Definition der CC1101-Initialisierungs-Register für die optimale Empfindlichkeit auf 433.92 MHz und 868.30 MHz.
 
+---
+
+## 6. Entwicklungs-Workflow & Test-Setup
+
+Dieses Kapitel beschreibt, wie neue Software auf den Pico W übertragen wird und wie das Test-Setup (sowohl Hardware als auch Software-Simulation) aufgebaut ist.
+
+### 6.1 Code-Deployment (Flashen der Skripte)
+
+Die Skripte im Verzeichnis `src/` werden direkt auf das Flash-Dateisystem des Raspberry Pi Pico W übertragen.
+
+*   **VS Code + "MicroPico"-Extension (Empfohlen):**
+    1. Pico W per USB-Kabel mit dem PC verbinden.
+    2. In VS Code den Befehl `MicroPico: Upload Project` ausführen.
+    3. Über den Button "Terminal" (unten in VS Code) direkt auf die interaktive Python-Konsole (REPL) zugreifen.
+*   **Kommandozeile (mpremote):**
+    *   Installation via `pip install mpremote`.
+    *   Dateien hochladen:
+        ```bash
+        mremote fs cp src/main.py :main.py
+        mremote fs cp -r src/decoders :decoders
+        ```
+    *   Konsole öffnen: `mpremote repl`
+
+### 6.2 Hardware-Testaufbau & Sicherheitshinweise
+
+Die beiden CC1101-Module werden direkt über den SPI0-Bus an den Pico W angeschlossen (siehe Belegungsplan in Kapitel 1.1).
+
+*   **Sicherheitsregel (Antennen):** Betreibe die CC1101-Module **niemals** ohne angeschlossene Antenne. Andernfalls kann die reflektierte Sendeleistung die HF-Endstufen der Module zerstören.
+    *   *433 MHz Antenne:* Drahtlänge ca. $17{,}3\,\text{cm}$ ($\lambda/4$).
+    *   *868 MHz Antenne:* Drahtlänge ca. $8{,}6\,\text{cm}$ ($\lambda/4$).
+*   **Spannungspegel:** Die CC1101-Module müssen mit **3.3 V** (VCC an `3V3(OUT)`) betrieben werden. Der RP2040 ist nicht 5V-tolerant.
+
+### 6.3 Test- und Debugging-Szenarien
+
+1.  **Decoder-Simulation (PC-basiert):**
+    Die Portierung der SignalDUINO-Decoder (Perl $\rightarrow$ Python) kann vollständig offline auf dem PC getestet werden. Dazu werden aufgezeichnete Pulsfolgen (als ganzzahlige Arrays in $\mu\text{s}$) an ein Testskript auf dem PC übergeben.
+2.  **Raw-Sniffing (Pico am PC):**
+    Über die USB-Serial-Konsole (REPL) kann der Pico W im Sniffer-Modus betrieben werden, um unbekannte RF-Signale abzufangen und deren Pulsfolgen live im Terminal auszugeben.
+3.  **End-to-End-Test:**
+    Der Pico W verbindet sich autonom mit dem WLAN und sendet JSON-Telegramme an den MQTT-Broker. Zur Live-Validierung der MQTT-Payloads wird die Verwendung von **MQTT Explorer** auf dem PC empfohlen.
+
