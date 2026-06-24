@@ -20,3 +20,7 @@ Desktop.ini
 # Lokale Konfigurationen (z.B. WLAN-Credentials)
 config_local.py
 .env
+
+# Temporäre Entwicklungs-Dateien
+scratch/
+

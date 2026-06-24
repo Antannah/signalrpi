@@ -206,3 +206,86 @@ class CC1101:
         else:
             rssi_dbm = (rssi_dec / 2.0) - 74.0
         return rssi_dbm
+
+    def init_fsk_packet(self, freq_mhz: float) -> None:
+        """
+        Konfiguriert den CC1101 in den 2-FSK Paket-Empfangsmodus.
+        Die Demodulation und Rahmenerkennung (Sync-Word 2DD4) erfolgen in Hardware.
+        Der fertige Paketstrom wird über die SPI-Schnittstelle ausgelesen.
+        """
+        self.reset()
+        
+        # 1. Trägerfrequenz einstellen
+        self.set_carrier_frequency(freq_mhz)
+        
+        # 2. Registerkonfiguration für FSK-Paketmodus
+        # Wir übernehmen das bewährte Registerset für Fine Offset / Ecowitt FSK-Empfang
+        fsk_regs = {
+            CC1101_IOCFG2:   0x2E,  # GDO2 auf Tri-state (nicht genutzt)
+            CC1101_IOCFG0:   0x06,  # GDO0: Asserts on sync word, deasserts at end of packet (wichtig für GDO0-Pin)
+            CC1101_FIFOTHR:  0x43,  # RX FIFO Threshold = 32 Bytes
+            CC1101_PKTCTRL1: 0x80,  # Append status bytes RSSI/LQI at the end of packet
+            CC1101_PKTCTRL0: 0x00,  # Fixed packet length mode
+            0x06:            0x0E,  # PKTLEN (Packet Length) = 14 Bytes
+            CC1101_MDMCFG4:  0xA9,  # Channel bandwidth = 100 kHz (for Fine Offset)
+            CC1101_MDMCFG3:  0x5C,  # Symbol rate
+            CC1101_MDMCFG2:  0x02,  # 2-FSK, 16/16 sync word bits detected (2DD4)
+            0x13:            0x22,  # MDMCFG1: 2 preamble bytes, no channel spacing
+            0x14:            0xF8,  # MDMCFG0: Channel spacing
+            0x15:            0x43,  # DEVIATN = 38 kHz
+            CC1101_MCSM0:    0x18,  # Autocalibrate on IDLE -> RX/TX
+            CC1101_FOCCFG:   0x16,  # Frequency Offset Compensation
+            CC1101_BSCFG:    0x6C,  # Bit Synchronization
+            CC1101_AGCCTRL2: 0x43,  # AGC Control
+            CC1101_AGCCTRL1: 0x68,  # AGC Control
+            CC1101_AGCCTRL0: 0x91,  # AGC Control
+            # Calibration
+            CC1101_FSCAL3:   0xE9,
+            CC1101_FSCAL2:   0x2A,
+            CC1101_FSCAL1:   0x00,
+            CC1101_FSCAL0:   0x1F,
+        }
+        
+        # Write all registers
+        for reg, val in fsk_regs.items():
+            self._write_reg(reg, val)
+            
+        # Write Sync Word registers (address 0x04 = 0x2D, address 0x05 = 0xD4)
+        self._write_reg(0x04, 0x2D)
+        self._write_reg(0x05, 0xD4)
+        
+        self.enable_rx()
+
+    def read_fsk_packet(self) -> bytearray:
+        """
+        Liest ein FSK-Paket aus dem CC1101-FIFO, falls verfügbar.
+        Gibt das Byte-Array zurück (16 Bytes: 14 Bytes Daten + 2 Bytes RSSI/LQI Status),
+        oder None, wenn kein Paket bereitsteht.
+        """
+        # Statusregister RXBYTES (0x3B) auslesen
+        rxbytes = self._read_status(0x3B)
+        
+        # Falls FIFO Overflow (Bit 7 gesetzt), löschen und neu starten
+        if rxbytes & 0x80:
+            self._write_strobe(CC1101_SIDLE)
+            self._write_strobe(CC1101_SFRX)
+            self._write_strobe(CC1101_SRX)
+            return None
+            
+        num_bytes = rxbytes & 0x7F
+        # Wir erwarten 16 Bytes (14 Bytes Payload + 2 Bytes RSSI/LQI)
+        if num_bytes >= 16:
+            self.cs_pin.value(0)
+            self.spi.write(bytearray([0xFF]))  # Burst read ab FIFO (0x3F | 0xC0 = 0xFF)
+            packet = self.spi.read(16)
+            self.cs_pin.value(1)
+            
+            # Restart RX to clear any remaining bytes and prepare for next packet
+            self._write_strobe(CC1101_SIDLE)
+            self._write_strobe(CC1101_SFRX)
+            self._write_strobe(CC1101_SRX)
+            
+            return packet
+            
+        return None
+

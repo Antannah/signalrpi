@@ -31,13 +31,12 @@ if has_config:
     
     print("Initialisiere HF-Empfänger...")
     cc_433.init_ask_ook(433.92)
-    cc_868.init_ask_ook(868.30)
+    cc_868.init_fsk_packet(868.30)  # 868 MHz im FSK-Paketmodus
     
     # 3. PIO-Receiver für die Flankenerkennung instanziieren
     # State Machine 0 für 433 MHz (GDO0 an GP20)
     rx_433 = PIOReceiver(sm_id=0, pin_num=20)
-    # State Machine 1 für 868 MHz (GDO0 an GP21)
-    rx_868 = PIOReceiver(sm_id=1, pin_num=21)
+    # Für 868 MHz wird kein PIO-Receiver benötigt, da Hardware-Framing verwendet wird.
     
     # 4. MQTT-Verbindung aufbauen
     print("Verbinde mit MQTT-Broker: {}...".format(config.MQTT_BROKER))
@@ -96,37 +95,44 @@ if has_config:
                 except Exception as ex:
                     print("Fehler beim MQTT-Senden (433 MHz):", ex)
                     
-        # 868 MHz Paketprüfung
-        packet_868 = rx_868.get_packet()
+        # 868 MHz Paketprüfung (FSK Paketmodus)
+        packet_868 = cc_868.read_fsk_packet()
         if packet_868:
-            rssi = cc_868.get_rssi()
-            print("[868 MHz] Signal empfangen (RSSI: {:.1f} dBm, Pulses: {}): {}".format(
-                rssi, len(packet_868), packet_868
+            payload = packet_868[:14]
+            rssi_val = packet_868[14]
+            # RSSI aus den CC1101-Statusbytes berechnen
+            if rssi_val >= 128:
+                rssi = (rssi_val - 256) / 2.0 - 74.0
+            else:
+                rssi = (rssi_val / 2.0) - 74.0
+                
+            print("[868 MHz] FSK Signal empfangen (RSSI: {:.1f} dBm): {}".format(
+                rssi, payload.hex().upper()
             ))
             
             # Dekodierungsversuch
-            decoded = decoders.decode_signal(packet_868)
+            decoded = decoders.decode_fsk_packet(payload)
             
             # Publizieren
             if client:
                 try:
                     if decoded:
                         topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
-                        payload = {
+                        payload_data = {
                             "protocol": decoded["protocol"],
                             "device_id": decoded["device_id"],
                             "data": decoded["data"],
-                            "signal": {"rssi": rssi, "pulses": len(packet_868)}
+                            "signal": {"rssi": rssi, "raw_len": len(payload)}
                         }
-                        client.publish(topic, json.dumps(payload))
+                        client.publish(topic, json.dumps(payload_data))
                     else:
-                        # Raw-Ausgabe für unbekannte Signale
+                        # Raw-Ausgabe für unbekannte FSK-Signale
                         client.publish("signalrpi/raw/868", json.dumps({
                             "rssi": rssi,
-                            "pulses": packet_868
+                            "raw": payload.hex().upper()
                         }))
                 except Exception as ex:
-                    print("Fehler beim MQTT-Senden (868 MHz):", ex)
+                    print("Fehler beim MQTT-Senden (868 MHz FSK):", ex)
                     
         # Kurze Pause zur Vermeidung von CPU-Volllast und zum Einlassen von Interrupts
         time.sleep_us(200)
