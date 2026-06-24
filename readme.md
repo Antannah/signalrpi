@@ -179,11 +179,11 @@ Für dieses Projekt wurde **MicroPython** als primäre Laufzeitumgebung auf dem 
 
 ```mermaid
 graph TD
-    subgraph RP2040 Microcontroller
-        PIO[PIO State Machines (Hardware)] -->|Hardware FIFO| DMA[DMA Controller]
-        DMA -->|Ringbuffer im RAM| MP[MicroPython Runtime (Python 3)]
-        MP -->|SignalDUINO Decoders| JSON[JSON Messages]
-        JSON -->|network & umqtt.simple| WiFi[CYW43439 WiFi Chip]
+    subgraph rp2040 ["RP2040 Microcontroller"]
+        PIO[PIO-Zustandsmaschinen] -->|Hardware FIFO| DMA[DMA-Controller]
+        DMA -->|Ringpuffer im RAM| MP[MicroPython-Laufzeit]
+        MP -->|SignalDUINO-Decoder| JSON[JSON-Nachrichten]
+        JSON -->|network und umqtt| WiFi[CYW43439 WiFi-Chip]
     end
     WiFi -->|MQTT via WLAN| Broker[MQTT Broker]
 ```
