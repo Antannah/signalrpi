@@ -1,0 +1,11 @@
+# mpremote zur Kommunikation und zum Deployment auf den Pico W
+mpremote>=1.22.0
+
+# Type Stubs für MicroPython-spezifische Module (z.B. machine, rp2) in VS Code / Antigravity IDE
+micropython-rp2-stubs
+
+# Test-Framework für den PC-basierten Simulator (Stufe 1)
+pytest>=8.0.0
+
+# MQTT-Bibliothek für Test-Skripte auf dem PC
+paho-mqtt>=2.0.0
