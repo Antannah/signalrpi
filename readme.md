@@ -203,15 +203,15 @@ graph TD
 
 | Phase | Bezeichnung | Fokus-Bereiche / Aufgaben | Status |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | **Firmware & PIO** | - Implementierung der PIO-State-Machines zur Flankenerkennung<br>- SPI-Treiber-Initialisierung und Register-Konfiguration der CC1101-Module | *In Vorbereitung* |
-| **Phase 2** | **Logik-Portierung** | - Parser für SignalDUINO-Telegramme (Roh-Pulsfolgen)<br>- Portierung der Protokoll-Decoder (FHEM Perl $\rightarrow$ Python/C++) | *In Vorbereitung* |
-| **Phase 3** | **MQTT & Netzwerk** | - WLAN-Kopplung (Pico W) oder USB-Serial-Kommunikation<br>- MQTT-Client-Implementierung und JSON-Serialisierung der Nachrichten | *In Vorbereitung* |
-| **Phase 4** | **Validierung** | - Integrationstests mit realen 433 MHz und 868 MHz HF-Sendern<br>- Reichweiten- und Sensitivitätsoptimierung | *In Vorbereitung* |
+| **Phase 1** | **Firmware & PIO** | - Implementierung der PIO-State-Machines zur Flankenerkennung<br>- SPI-Treiber-Initialisierung und Register-Konfiguration der CC1101-Module | **Abgeschlossen** |
+| **Phase 2** | **Logik-Portierung** | - Parser für SignalDUINO-Telegramme (Roh-Pulsfolgen)<br>- Portierung der Protokoll-Decoder (FHEM Perl $\rightarrow$ Python/C++) | **Abgeschlossen** |
+| **Phase 3** | **MQTT & Netzwerk** | - WLAN-Kopplung (Pico W) oder USB-Serial-Kommunikation<br>- MQTT-Client-Implementierung und JSON-Serialisierung der Nachrichten | **Abgeschlossen** |
+| **Phase 4** | **Validierung** | - Integrationstests mit realen 433 MHz und 868 MHz HF-Sendern<br>- Reichweiten- und Sensitivitätsoptimierung | **Abgeschlossen (Offline)** |
 
 ### Fortlaufende Aufgaben & offene Punkte:
 - [x] Auswahl der Software-Plattform: **MicroPython** auf **Raspberry Pi Pico W**.
 - [x] Auswahl der primären Zielprotokolle (TFA/NC_WS, Intertechno, Bodenfeuchte/Regen-Sensoren).
-- [ ] Definition der CC1101-Initialisierungs-Register für die optimale Empfindlichkeit auf 433.92 MHz und 868.30 MHz.
+- [x] Definition der CC1101-Initialisierungs-Register für OOK (433.92 MHz) und FSK-Paketmodus (868.30 MHz).
 
 ---
 
@@ -258,20 +258,29 @@ Die beiden CC1101-Module werden direkt über den SPI0-Bus an den Pico W angeschl
 
 ## 7. Decoder-Spezifikation & Unterstützte Protokolle
 
-Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen, konzentriert sich die erste Phase der Entwicklung auf die Portierung der folgenden drei Decoder-Gruppen.
+Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen, wurden die folgenden Decoder implementiert und integriert.
 
 ### 7.1 CUL_TCM97001 (TFA / NC_WS Klimasensoren)
 *   **HF-Parameter:** Frequenz 433.92 MHz, Modulation ASK/OOK.
-*   **Beschreibung:** Dieser Decoder übersetzt Signale von Temperatur- und Luftfeuchtigkeitssensoren (z. B. TFA Thermo-Hygrometer).
-*   **Telegramm-Format:** Typischerweise 36-Bit PWM (Pulse-Width Modulation).
-    *   *Puls-Timing:* Kurzer Puls ($\approx 500\,\mu\text{s}$), langer Puls ($\approx 1000\,\mu\text{s}$), Bit-Abstand ($\approx 1000\,\mu\text{s}$ oder $2000\,\mu\text{s}$).
+*   **Beschreibung:** Dieser Decoder übersetzt Signale von Temperatur- und Luftfeuchtigkeitssensoren (z. B. TFA Thermo-Hygrometer oder PEARL NC7159).
+*   **Telegramm-Format:** 36-Bit PWM (Pulse-Width Modulation).
+    *   *Puls-Timing:*
+        *   **Sync:** ca. $500\,\mu\text{s}$ High + $9000\,\mu\text{s}$ Low.
+        *   **Logisch 0:** ca. $500\,\mu\text{s}$ High + $2000\,\mu\text{s}$ Low.
+        *   **Logisch 1:** ca. $500\,\mu\text{s}$ High + $4000\,\mu\text{s}$ Low.
+    *   *Dekodierungslogik:* 
+        *   Extrahiert die 12-Bit-Temperatur (Bits 16-27), wobei negative Werte im Zweierkomplement berechnet werden.
+        *   Extrahiert die 7-Bit-Luftfeuchtigkeit (Bits 29-35), den Kanal (Bits 14-15), den Batteriestatus (Low = `0`, OK = `1`) und den Sendemodus.
+        *   Die Geräte-ID in FHEM entspricht dem dezimalen Wert des ersten Bytes (z. B. `0x50` -> ID `80`).
 *   **MQTT-Topic:** `signalrpi/messages/CUL_TCM97001/<device_id>`
 *   **JSON-Payload:**
     ```json
     {
       "temperature": 21.4,
       "humidity": 55.0,
-      "battery_low": false
+      "battery_low": false,
+      "channel": 3,
+      "forced_send": false
     }
     ```
 
@@ -293,19 +302,34 @@ Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen,
 ### 7.3 SD_WS (SignalDUINO Wettersensoren)
 Dieser Decoder fasst verschiedene Wettersensoren (Bodenfeuchte und Regen) zusammen, die über das SignalDUINO-Framework empfangen werden.
 
-#### SD_WS_50 (Bodenfeuchtesensoren)
-*   **HF-Parameter:** Frequenz 433.92 MHz / 868.30 MHz, ASK/OOK.
-*   **MQTT-Topic:** `signalrpi/messages/SD_WS_50/<device_id>`
-*   **JSON-Payload:** `{"moisture": 45.0, "battery_low": false}`
+#### SD_WS_50 (Bodenfeuchtesensoren / Opus XT300)
+*   **HF-Parameter:** Frequenz 433.92 MHz, ASK/OOK (Pulsweiten-Modulation).
+*   **Puls-Timing:**
+    *   **Logisch 0:** ca. $1500\,\mu\text{s}$ High + $1000\,\mu\text{s}$ Low.
+    *   **Logisch 1:** ca. $500\,\mu\text{s}$ High + $1000\,\mu\text{s}$ Low.
+    *   **Paketlänge:** 48 Bits (6 Bytes), Preamble stets `0xFF`.
+*   **Prüfsumme:** Summe der Bytes 1 bis 4 modulo 256 entspricht Byte 5.
+*   **MQTT-Topic:** `signalrpi/messages/SD_WS_50/SM_<sensor_id>` (z. B. `SM_1`)
+*   **JSON-Payload:** `{"moisture": 45.0, "temperature": 23.5}`
 
-#### SD_WS_107 (Eurochron Bodenfeuchtesensoren)
-*   **HF-Parameter:** Frequenz 433.92 MHz / 868.30 MHz, ASK/OOK.
-*   **MQTT-Topic:** `signalrpi/messages/SD_WS_107/<device_id>`
-*   **JSON-Payload:** `{"moisture": 62.0, "temperature": 18.5}`
+#### SD_WS_107 (Eurochron Bodenfeuchtesensoren / Fine Offset WH51)
+*   **HF-Parameter:** Frequenz 868.30 MHz, Modulation 2-FSK (Paketmodus).
+*   **Hardware-Empfang:** CC1101 synchronisiert auf das Sync-Word `2DD4`, filtert nach Paketlänge (14 Bytes Payload) und reicht die Bytes per SPI weiter.
+*   **Validierung:** 
+    *   Prüft auf Family-Code `0x51`.
+    *   Prüft CRC8 (Polynom `0x31`, Startwert `0x00`) über Byte 0-11 gegen Byte 12.
+    *   Prüft Sum-8 Checksumme über Byte 0-12 gegen Byte 13.
+*   **MQTT-Topic:** `signalrpi/messages/SD_WS_107/<device_id>` (z. B. `0D32C1`)
+*   **JSON-Payload:** `{"moisture": 62.0, "battery_voltage": 1.6, "battery_low": false, "adc": 199}`
 
-#### SD_WS_126 (Bresser Regensensor)
-*   **HF-Parameter:** Frequenz 433.92 MHz / 868.30 MHz, ASK/OOK.
-*   **MQTT-Topic:** `signalrpi/messages/SD_WS_126/<device_id>`
-*   **JSON-Payload:** `{"rain_total": 12.3, "battery_low": false}`
+#### SD_WS_126 (Bresser/Ecowitt Regensensor WH40)
+*   **HF-Parameter:** Frequenz 868.30 MHz, Modulation 2-FSK (Paketmodus).
+*   **Hardware-Empfang:** CC1101 synchronisiert auf das Sync-Word `2DD4`, filtert nach Paketlänge (14 Bytes Payload).
+*   **Validierung:**
+    *   Prüft auf Family-Code `0x40`.
+    *   Prüft CRC8 (Polynom `0x31`, Startwert `0x00`) über Byte 0-6 gegen Byte 7.
+    *   Prüft Sum-8 Checksumme über Byte 0-7 gegen Byte 8.
+*   **MQTT-Topic:** `signalrpi/messages/SD_WS_126/<device_id>` (z. B. `011CDF`)
+*   **JSON-Payload:** `{"rain_total": 12.3, "rain_ticks": 123, "battery_voltage": 1.5, "battery_low": false}`
 
 
