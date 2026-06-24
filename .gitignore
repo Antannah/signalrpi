@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# IDEs / Editoren
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Systemdateien
+Thumbs.db
+Desktop.ini
+
+# Lokale Konfigurationen (z.B. WLAN-Credentials)
+config_local.py
+.env
