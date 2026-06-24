@@ -210,7 +210,7 @@ graph TD
 
 ### Fortlaufende Aufgaben & offene Punkte:
 - [x] Auswahl der Software-Plattform: **MicroPython** auf **Raspberry Pi Pico W**.
-- [ ] Auswahl der primären Zielprotokolle (z. B. welche Sensoren/Aktoren aktiv im Einsatz sind).
+- [x] Auswahl der primären Zielprotokolle (TFA/NC_WS, Intertechno, Bodenfeuchte/Regen-Sensoren).
 - [ ] Definition der CC1101-Initialisierungs-Register für die optimale Empfindlichkeit auf 433.92 MHz und 868.30 MHz.
 
 ---
@@ -253,4 +253,59 @@ Die beiden CC1101-Module werden direkt über den SPI0-Bus an den Pico W angeschl
     Über die USB-Serial-Konsole (REPL) kann der Pico W im Sniffer-Modus betrieben werden, um unbekannte RF-Signale abzufangen und deren Pulsfolgen live im Terminal auszugeben.
 3.  **End-to-End-Test:**
     Der Pico W verbindet sich autonom mit dem WLAN und sendet JSON-Telegramme an den MQTT-Broker. Zur Live-Validierung der MQTT-Payloads wird die Verwendung von **MQTT Explorer** auf dem PC empfohlen.
+
+---
+
+## 7. Decoder-Spezifikation & Unterstützte Protokolle
+
+Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen, konzentriert sich die erste Phase der Entwicklung auf die Portierung der folgenden drei Decoder-Gruppen.
+
+### 7.1 CUL_TCM97001 (TFA / NC_WS Klimasensoren)
+*   **HF-Parameter:** Frequenz 433.92 MHz, Modulation ASK/OOK.
+*   **Beschreibung:** Dieser Decoder übersetzt Signale von Temperatur- und Luftfeuchtigkeitssensoren (z. B. TFA Thermo-Hygrometer).
+*   **Telegramm-Format:** Typischerweise 36-Bit PWM (Pulse-Width Modulation).
+    *   *Puls-Timing:* Kurzer Puls ($\approx 500\,\mu\text{s}$), langer Puls ($\approx 1000\,\mu\text{s}$), Bit-Abstand ($\approx 1000\,\mu\text{s}$ oder $2000\,\mu\text{s}$).
+*   **MQTT-Topic:** `signalrpi/messages/CUL_TCM97001/<device_id>`
+*   **JSON-Payload:**
+    ```json
+    {
+      "temperature": 21.4,
+      "humidity": 55.0,
+      "battery_low": false
+    }
+    ```
+
+### 7.2 Intertechno (IT - Funkaktoren & Fernbedienungen)
+*   **HF-Parameter:** Frequenz 433.92 MHz, Modulation ASK/OOK.
+*   **Beschreibung:** Steuert Funksteckdosen, Jalousien-Aktoren und empfängt Signale von Wandschaltern.
+*   **Telegramm-Format:** Tri-State oder feste Puls-Pausen-Verhältnisse (12 oder 26 Bits).
+    *   *Puls-Timing:* Typisch $350\,\mu\text{s}$ High / $1050\,\mu\text{s}$ Low (Logisch 0) bzw. $1050\,\mu\text{s}$ High / $350\,\mu\text{s}$ Low (Logisch 1).
+*   **MQTT-Topic:** `signalrpi/messages/IT/<device_id>`
+*   **JSON-Payload:**
+    ```json
+    {
+      "state": "on",     // oder "off"
+      "group": "0",
+      "channel": "0001"
+    }
+    ```
+
+### 7.3 SD_WS (SignalDUINO Wettersensoren)
+Dieser Decoder fasst verschiedene Wettersensoren (Bodenfeuchte und Regen) zusammen, die über das SignalDUINO-Framework empfangen werden.
+
+#### SD_WS_50 (Bodenfeuchtesensoren)
+*   **HF-Parameter:** Frequenz 433.92 MHz / 868.30 MHz, ASK/OOK.
+*   **MQTT-Topic:** `signalrpi/messages/SD_WS_50/<device_id>`
+*   **JSON-Payload:** `{"moisture": 45.0, "battery_low": false}`
+
+#### SD_WS_107 (Eurochron Bodenfeuchtesensoren)
+*   **HF-Parameter:** Frequenz 433.92 MHz / 868.30 MHz, ASK/OOK.
+*   **MQTT-Topic:** `signalrpi/messages/SD_WS_107/<device_id>`
+*   **JSON-Payload:** `{"moisture": 62.0, "temperature": 18.5}`
+
+#### SD_WS_126 (Bresser Regensensor)
+*   **HF-Parameter:** Frequenz 433.92 MHz / 868.30 MHz, ASK/OOK.
+*   **MQTT-Topic:** `signalrpi/messages/SD_WS_126/<device_id>`
+*   **JSON-Payload:** `{"rain_total": 12.3, "battery_low": false}`
+
 
