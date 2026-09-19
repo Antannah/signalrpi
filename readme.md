@@ -10,34 +10,50 @@ Die zeitkritische Erfassung der Signalflanken (im Bereich von $100\,\mu\text{s}$
 
 ```mermaid
 graph TD
-    RF433[433 MHz CC1101] -->|GDO0 Pin| PIO0[RP2040: PIO State Machine 0]
-    RF868[868 MHz CC1101] -->|GDO0 Pin| PIO1[RP2040: PIO State Machine 1]
+    RF433[433 MHz CC1101 Links] -->|GDO0 Pin GP6| PIO0[RP2040: PIO State Machine 0]
+    RF868[868 MHz CC1101 Rechts] -->|GDO0 Pin GP21| PIO1[RP2040: PIO SM1 / FSK FIFO]
     
-    RF433 <-->|SPI0 Bus shared| SPI[RP2040: SPI Controller]
-    RF868 <-->|SPI0 Bus shared| SPI
+    RF433 <-->|SPI1 GP10-12| SPI1[RP2040: SPI1 Controller]
+    RF868 <-->|SPI0 GP16/18/19| SPI0[RP2040: SPI0 Controller]
     
     PIO0 -->|Pulse Durations| CPU[RP2040: CPU Core 0/1]
-    PIO1 -->|Pulse Durations| CPU
+    PIO1 -->|Pulse / FSK Bytes| CPU
     
-    CPU -->|JSON Payloads| Comm[RP2040: WiFi / Serial Interface]
+    CPU -->|JSON Payloads| Comm[RP2040: WiFi CYW43439]
     Comm -->|MQTT / TCP| Broker[MQTT Broker]
 ```
+ 
+### 1.1 Pin-Belegung (RP2040 zu 2× CC1101 via getrennte SPI-Busse)
 
-### 1.1 Pin-Belegung (RP2040 zu CC1101)
+Die beiden CC1101-Module nutzen zwei **getrennte Hardware-SPI-Controller** des RP2040 (SPI1 auf der linken Pinleiste, SPI0 auf der rechten Pinleiste). Dadurch werden Buskollisionen und kapazitive Lasten auf den Leitungen vermieden.
 
-Die beiden CC1101-Module teilen sich den primären SPI0-Bus des RP2040. Die Selektion der Module erfolgt über separate Chip-Select-Leitungen (CSn). Die Demodulationssignale werden über die GDO0-Pins der CC1101-Module an GPIOs geführt, die von den PIO-State-Machines überwacht werden.
+#### Modul 1: 433 MHz Transceiver (Links, SPI1)
+| CC1101 Funktion | RP2040 Pin (physisch) | RP2040 GPIO | Beschreibung |
+| :--- | :--- | :--- | :--- |
+| **VCC** | **Pin 36** | `3V3(OUT)` | Spannungsversorgung (3.3 V) |
+| **GND** | **Pin 13** (oder 18) | `GND` | Masse |
+| **SCK** | **Pin 14** | `GP10 (SPI1 SCK)` | SPI Clock |
+| **MOSI (SI)** | **Pin 15** | `GP11 (SPI1 TX)` | SPI Data In (Modul) / Out (Pico) |
+| **MISO (SO)** | **Pin 16** | `GP12 (SPI1 RX)` | SPI Data Out (Modul) / In (Pico) |
+| **CSn** | **Pin 17** | `GP13` | Chip Select Modul 1 |
+| **GDO0** | **Pin 9** | `GP6` | Demoduliertes Signal (PIO SM0 Flankenerkennung) |
+| *(GDO2)* | **Pin 10** | `GP7` | Optional / Reserve |
 
-| CC1101-Funktion | CC1101 #1 (433 MHz) | CC1101 #2 (868 MHz) | RP2040 Pin | Beschreibung |
-| :--- | :--- | :--- | :--- | :--- |
-| **VCC** | VCC (3.3V) | VCC (3.3V) | **3V3(OUT)** | Spannungsversorgung (3.3 V) |
-| **GND** | GND | GND | **GND** | Masse |
-| **MOSI** | SI | SI | **GP19 (SPI0 TX)** | SPI Data Out |
-| **MISO** | SO | SO | **GP16 (SPI0 RX)** | SPI Data In |
-| **SCLK** | SCLK | SCLK | **GP18 (SPI0 SCK)** | SPI Clock |
-| **CSn** | CSn | | **GP17** | Chip Select Modul 1 |
-| | | CSn | **GP22** | Chip Select Modul 2 |
-| **GDO0** | GDO0 | | **GP20** | Signalflankenerkennung Modul 1 (PIO SM0) |
-| | | GDO0 | **GP21** | Signalflankenerkennung Modul 2 (PIO SM1) |
+#### Modul 2: 868 MHz Transceiver (Rechts, SPI0)
+| CC1101 Funktion | RP2040 Pin (physisch) | RP2040 GPIO | Beschreibung |
+| :--- | :--- | :--- | :--- |
+| **VCC** | **Pin 36** | `3V3(OUT)` | Spannungsversorgung (3.3 V) |
+| **GND** | **Pin 23** (oder 28/38) | `GND` | Masse |
+| **MISO (SO)** | **Pin 21** | `GP16 (SPI0 RX)` | SPI Data Out (Modul) / In (Pico) |
+| **CSn** | **Pin 22** | `GP17` | Chip Select Modul 2 |
+| **SCK** | **Pin 24** | `GP18 (SPI0 SCK)` | SPI Clock |
+| **MOSI (SI)** | **Pin 25** | `GP19 (SPI0 TX)` | SPI Data In (Modul) / Out (Pico) |
+| **GDO0** | **Pin 27** | `GP21` | Signal/Sync (PIO SM1 bei OOK oder FSK-Trigger) |
+| *(GDO2)* | **Pin 26** | `GP20` | Optional / Reserve |
+
+#### Pufferkondensator-Konzept (bei ca. 15 cm Leitungslänge)
+* **Zentraler Puffer:** $1\times 100\,\mu\text{F}$ Elektrolytkondensator direkt am Pico W zwischen `3V3(OUT)` (Pin 36) und `GND`.
+* **Lokale HF-Entkopplung:** Je $1\times 10\,\mu\text{F}$ Keramikkondensator (MLCC X7R/X5R) direkt an den VCC/GND-Pins der beiden CC1101-Module am Leitungsende.
 
 ---
 

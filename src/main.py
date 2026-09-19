@@ -19,15 +19,17 @@ except ImportError:
     has_config = False
 
 if has_config:
-    # 1. SPI-Bus für CC1101-Module initialisieren
-    # GP18 = SCK, GP19 = MOSI, GP16 = MISO
-    spi = SPI(0, baudrate=5_000_000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
+    # 1. SPI-Busse für CC1101-Module initialisieren (2 getrennte Hardware-Controller)
+    # SPI1 (Links): GP10 = SCK, GP11 = MOSI, GP12 = MISO
+    spi1 = SPI(1, baudrate=5_000_000, polarity=0, phase=0, sck=Pin(10), mosi=Pin(11), miso=Pin(12))
+    # SPI0 (Rechts): GP18 = SCK, GP19 = MOSI, GP16 = MISO
+    spi0 = SPI(0, baudrate=5_000_000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
     
     # 2. CC1101-Module instanziieren
-    # CC1101 #1 für 433 MHz: CS = GP17, GDO0 = GP20
-    cc_433 = CC1101(spi, cs_pin=Pin(17), gdo0_pin=Pin(20))
-    # CC1101 #2 für 868 MHz: CS = GP22, GDO0 = GP21
-    cc_868 = CC1101(spi, cs_pin=Pin(22), gdo0_pin=Pin(21))
+    # CC1101 #1 für 433 MHz (Links): SPI1, CS = GP13, GDO0 = GP6
+    cc_433 = CC1101(spi1, cs_pin=Pin(13), gdo0_pin=Pin(6))
+    # CC1101 #2 für 868 MHz (Rechts): SPI0, CS = GP17, GDO0 = GP21
+    cc_868 = CC1101(spi0, cs_pin=Pin(17), gdo0_pin=Pin(21))
     
     # Betriebsmodus für 868 MHz konfigurieren (Standard: FSK)
     mode_868 = getattr(config, "MODE_868", "FSK").upper()
@@ -36,8 +38,8 @@ if has_config:
     cc_433.init_ask_ook(433.92)
     
     # 3. PIO-Receiver für die Flankenerkennung instanziieren
-    # State Machine 0 für 433 MHz (GDO0 an GP20)
-    rx_433 = PIOReceiver(sm_id=0, pin_num=20)
+    # State Machine 0 für 433 MHz (GDO0 an GP6)
+    rx_433 = PIOReceiver(sm_id=0, pin_num=6)
     
     if mode_868 == "FSK":
         print("868 MHz Empfänger im FSK-Paketmodus initialisiert.")
