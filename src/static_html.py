@@ -114,9 +114,27 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
   </div>
 </div>
 
+<!-- Modal für Rohdaten-Inspektor / Signal-Export -->
+<div id="raw-modal" class="modal">
+  <div class="modal-card" style="max-width:540px">
+    <h3 style="margin-bottom:8px">🔬 Signal-Rohdaten & Export</h3>
+    <div id="raw-modal-meta" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px"></div>
+    <label style="font-size:0.8rem;color:var(--text-dim)">Pulsfolge / Rohdaten:</label>
+    <textarea id="raw-modal-text" style="width:100%;height:150px;background:rgba(15,23,42,0.9);color:#38bdf8;border:1px solid var(--border);border-radius:6px;padding:8px;font-family:monospace;font-size:0.75rem;margin:6px 0 12px;resize:vertical" readonly></textarea>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between">
+      <div style="display:flex;gap:6px">
+        <button class="btn" onclick="copyRaw('json')">📋 JSON kopieren</button>
+        <button class="btn btn-amber" onclick="copyRaw('text')">📋 SignalESP/FHEM</button>
+      </div>
+      <button class="btn" style="background:#64748b;color:#fff" onclick="closeRawModal()">Schließen</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let knownDevices = [];
 let pendingReassign = null;
+let currentRawData = null;
 
 function showTab(tabId){
   document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
@@ -143,14 +161,22 @@ async function refreshDevices(){
         </div>
         <div class="val-grid">
           ${(d.entities||[]).map(e=>{
-            let cur = (d.latest && d.latest[e.key] !== undefined) ? d.latest[e.key] : '--';
-            return `<div class="val-box"><div class="val-title">${e.name}</div><div class="val-num" id="val_${d.id}_${e.key}">${cur} ${e.unit||''}</div></div>`;
+            let val = d.last_values ? d.last_values[e.key] : null;
+            return `
+              <div class="val-box">
+                <div class="val-title">${e.name}</div>
+                <div class="val-num">${val!==null && val!==undefined ? val+(e.unit?' '+e.unit:'') : '--'}</div>
+              </div>
+            `;
           }).join('')}
         </div>
-        <button class="btn btn-del" onclick="delDevice('${d.id}')">Löschen</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+          <span style="font-size:0.75rem;color:var(--text-dim)">${d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Noch kein Empfang'}</span>
+          <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">Löschen</button>
+        </div>
       </div>
     `).join('');
-  }catch(e){console.error(e);}
+  }catch(e){}
 }
 
 async function delDevice(id){
@@ -158,6 +184,10 @@ async function delDevice(id){
     await fetch('/api/devices?id='+id, {method:'DELETE'});
     refreshDevices();
   }
+}
+
+function deleteDevice(id){
+  return delDevice(id);
 }
 
 async function updateSystem(){
@@ -182,6 +212,13 @@ function startSniffer(){
         
         let devBadge = p.device_name ? `<span style="background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;border-radius:12px;font-weight:600;font-size:0.75rem;margin-left:6px">✔ ${p.device_name}</span>` : '';
         let dataStr = Object.entries(p.data||{}).map(([k,v])=>`${k}: <b>${v}</b>`).join(' | ');
+        
+        let rawBtn = p.raw ? `<button class="btn" style="background:#475569;color:#fff" onclick='openRawModal(${JSON.stringify(p)})'>🔬 Rohdaten</button>` : '';
+        let reassignBtn = p.proto!=='RAW_433' && p.proto!=='RAW_868_OOK' && p.proto!=='RAW_868_FSK' 
+          ? `<button class="btn btn-amber" onclick="openReassign('${p.proto}','${p.id}','${p.channel||''}')">Zuordnen</button>
+             <button class="btn" onclick="adoptDevice('${p.proto}','${p.id}','${p.channel||''}')">Neu anlernen</button>` 
+          : '';
+
         div.innerHTML = `
           <div>
             <span style="color:var(--text-dim)">[${p.time}]</span> 
@@ -190,11 +227,11 @@ function startSniffer(){
             (ID: <code>${p.id}</code>${p.channel?' Ch:'+p.channel:''}) 
             ${devBadge}
             <span style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:0.75rem;margin-left:4px">${p.rssi} dBm</span>
-            <div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">${dataStr||'Rohdaten'}</div>
+            <div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">${dataStr||(p.raw ? 'Rohsignal ('+(Array.isArray(p.raw)?p.raw.length+' Pulse':p.raw.length+' Zeichen')+')' : 'Rohdaten')}</div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-amber" onclick="openReassign('${p.proto}','${p.id}','${p.channel||''}')">Zuordnen</button>
-            <button class="btn" onclick="adoptDevice('${p.proto}','${p.id}','${p.channel||''}')">Neu anlernen</button>
+            ${rawBtn}
+            ${reassignBtn}
           </div>
         `;
         s.insertBefore(div, s.firstChild);
@@ -204,6 +241,46 @@ function startSniffer(){
     setTimeout(poll, 1500);
   };
   poll();
+}
+
+function openRawModal(pkt){
+  currentRawData = pkt;
+  let isArr = Array.isArray(pkt.raw);
+  let countInfo = isArr ? `${pkt.raw.length} Flanken / Pulse` : `${pkt.raw.length} Zeichen (Hex-Stream)`;
+  document.getElementById('raw-modal-meta').innerHTML = `
+    <b>Band:</b> ${pkt.band} | <b>Signal:</b> ${pkt.proto} | <b>RSSI:</b> ${pkt.rssi} dBm | <b>Länge:</b> ${countInfo}
+  `;
+  let ta = document.getElementById('raw-modal-text');
+  if(isArr){
+    ta.value = JSON.stringify(pkt.raw);
+  } else {
+    ta.value = pkt.raw || '';
+  }
+  document.getElementById('raw-modal').style.display = 'flex';
+}
+
+function closeRawModal(){
+  document.getElementById('raw-modal').style.display = 'none';
+  currentRawData = null;
+}
+
+function copyRaw(fmt){
+  if(!currentRawData || !currentRawData.raw) return;
+  let txt = '';
+  if(fmt === 'json'){
+    txt = JSON.stringify(currentRawData.raw);
+  } else if(fmt === 'text'){
+    if(Array.isArray(currentRawData.raw)){
+      txt = currentRawData.raw.map(v => (v > 0 ? '+' : '') + v).join(' ');
+    } else {
+      txt = currentRawData.raw;
+    }
+  }
+  navigator.clipboard.writeText(txt).then(()=>{
+    alert('In die Zwischenablage kopiert (' + fmt.toUpperCase() + ')!');
+  }).catch(()=>{
+    prompt('Kopieren fehlgeschlagen. Hier manuell kopieren:', txt);
+  });
 }
 
 function adoptDevice(proto, id, ch){

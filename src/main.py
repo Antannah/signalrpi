@@ -102,7 +102,7 @@ if has_config:
     # Puffer für Live-Sniffer im Webinterface (max 30 Pakete)
     sniffer_queue = []
 
-    def push_sniffer(band, proto, dev_id, rssi, data=None, channel=None, matched_name=None):
+    def push_sniffer(band, proto, dev_id, rssi, data=None, channel=None, matched_name=None, raw_data=None):
         if len(sniffer_queue) > 30:
             sniffer_queue.pop(0)
         t = time.localtime()
@@ -115,7 +115,8 @@ if has_config:
             "channel": channel,
             "rssi": round(rssi, 1),
             "data": data or {},
-            "device_name": matched_name
+            "device_name": matched_name,
+            "raw": raw_data
         })
 
     # 7. Asynchroner Webserver starten
@@ -143,7 +144,9 @@ if has_config:
                 proto_name = decoded["protocol"] if decoded else "RAW_433"
                 dev_id_str = str(decoded["device_id"]) if decoded else "-"
                 ch = decoded.get("data", {}).get("channel") if decoded else None
-                push_sniffer("433 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, channel=ch, matched_name=matched_name)
+                # Bei unbekannten Signalen Rohpulse (max. 120 Flanken) für Web-UI mitsenden
+                raw_to_send = packet_433[:120] if not decoded else None
+                push_sniffer("433 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, channel=ch, matched_name=matched_name, raw_data=raw_to_send)
                 
                 if client:
                     try:
@@ -185,7 +188,8 @@ if has_config:
                     
                     proto_name = decoded["protocol"] if decoded else "RAW_868_FSK"
                     dev_id_str = str(decoded["device_id"]) if decoded else payload[:4].hex().upper()
-                    push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None)
+                    raw_fsk = payload.hex().upper() if not decoded else None
+                    push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, raw_data=raw_fsk)
                     
                     if client:
                         try:
@@ -217,7 +221,8 @@ if has_config:
                     decoded = decoders.decode_signal(packet_868)
                     proto_name = decoded["protocol"] if decoded else "RAW_868_OOK"
                     dev_id_str = str(decoded["device_id"]) if decoded else "-"
-                    push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None)
+                    raw_ook = packet_868[:120] if not decoded else None
+                    push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, raw_data=raw_ook)
                     if client and decoded:
                         topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
                         client.publish(topic, json.dumps(decoded))
