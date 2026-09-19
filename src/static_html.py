@@ -181,6 +181,7 @@ function startSniffer(){
         div.className = 'packet';
         
         let devBadge = p.device_name ? `<span style="background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;border-radius:12px;font-weight:600;font-size:0.75rem;margin-left:6px">✔ ${p.device_name}</span>` : '';
+        let dataStr = Object.entries(p.data||{}).map(([k,v])=>`${k}: <b>${v}</b>`).join(' | ');
         div.innerHTML = `
           <div>
             <span style="color:var(--text-dim)">[${p.time}]</span> 
