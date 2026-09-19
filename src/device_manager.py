@@ -160,7 +160,7 @@ class DeviceManager:
             self.latest_values = {}
         self.latest_values[dev_id] = data
 
-    def match_and_get_id(self, decoded_data):
+    def match_and_get_info(self, decoded_data):
         # Prüft, ob ein empfangenes Funkpaket zu einem konfigurierten Gerät passt
         proto = decoded_data.get("protocol")
         dev_id_val = str(decoded_data.get("device_id"))
@@ -181,6 +181,10 @@ class DeviceManager:
             
             # Treffer: Letzte Werte merken
             self.set_latest(dev["id"], data)
-            return dev["id"]
+            return dev["id"], dev.get("name", dev["id"])
             
-        return None
+        return None, None
+
+    def match_and_get_id(self, decoded_data):
+        dev_id, _ = self.match_and_get_info(decoded_data)
+        return dev_id

@@ -102,7 +102,7 @@ if has_config:
     # Puffer für Live-Sniffer im Webinterface (max 30 Pakete)
     sniffer_queue = []
 
-    def push_sniffer(band, proto, dev_id, rssi, data=None, channel=None):
+    def push_sniffer(band, proto, dev_id, rssi, data=None, channel=None, matched_name=None):
         if len(sniffer_queue) > 30:
             sniffer_queue.pop(0)
         t = time.localtime()
@@ -114,7 +114,8 @@ if has_config:
             "id": dev_id,
             "channel": channel,
             "rssi": round(rssi, 1),
-            "data": data or {}
+            "data": data or {},
+            "device_name": matched_name
         })
 
     # 7. Asynchroner Webserver starten
@@ -135,10 +136,14 @@ if has_config:
                 rssi = cc_433.get_rssi()
                 decoded = decoders.decode_signal(packet_433)
                 
+                matched_ha_id, matched_name = (None, None)
+                if decoded:
+                    matched_ha_id, matched_name = device_mgr.match_and_get_info(decoded)
+                    
                 proto_name = decoded["protocol"] if decoded else "RAW_433"
                 dev_id_str = str(decoded["device_id"]) if decoded else "-"
                 ch = decoded.get("data", {}).get("channel") if decoded else None
-                push_sniffer("433 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, channel=ch)
+                push_sniffer("433 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, channel=ch, matched_name=matched_name)
                 
                 if client:
                     try:
@@ -154,7 +159,6 @@ if has_config:
                             client.publish(topic, json.dumps(payload))
                             
                             # 2. Falls einem konfigurierten HA-Device zugeordnet -> HA State Topic
-                            matched_ha_id = device_mgr.match_and_get_id(decoded)
                             if matched_ha_id:
                                 ha_topic = "signalrpi/devices/{}/state".format(matched_ha_id)
                                 client.publish(ha_topic, json.dumps(decoded["data"]))

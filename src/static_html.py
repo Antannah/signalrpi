@@ -180,14 +180,15 @@ function startSniffer(){
         let div = document.createElement('div');
         div.className = 'packet';
         
-        let dataStr = Object.entries(p.data||{}).map(([k,v])=>`${k}: <b>${v}</b>`).join(' | ');
+        let devBadge = p.device_name ? `<span style="background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;border-radius:12px;font-weight:600;font-size:0.75rem;margin-left:6px">✔ ${p.device_name}</span>` : '';
         div.innerHTML = `
           <div>
             <span style="color:var(--text-dim)">[${p.time}]</span> 
             <span style="color:var(--accent);font-weight:700">[${p.band}]</span> 
             <b>${p.proto}</b> 
             (ID: <code>${p.id}</code>${p.channel?' Ch:'+p.channel:''}) 
-            <span style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:0.75rem">${p.rssi} dBm</span>
+            ${devBadge}
+            <span style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:0.75rem;margin-left:4px">${p.rssi} dBm</span>
             <div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">${dataStr||'Rohdaten'}</div>
           </div>
           <div style="display:flex;gap:6px">
