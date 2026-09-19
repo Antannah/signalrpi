@@ -28,28 +28,37 @@ graph TD
 Die beiden CC1101-Module nutzen zwei **getrennte Hardware-SPI-Controller** des RP2040 (SPI1 auf der linken Pinleiste, SPI0 auf der rechten Pinleiste). Dadurch werden Buskollisionen und kapazitive Lasten auf den Leitungen vermieden.
 
 #### Modul 1: 433 MHz Transceiver (Links, SPI1)
-| CC1101 Funktion | RP2040 Pin (physisch) | RP2040 GPIO | Beschreibung |
-| :--- | :--- | :--- | :--- |
-| **VCC** | **Pin 36** | `3V3(OUT)` | Spannungsversorgung (3.3 V) |
-| **GND** | **Pin 13** (oder 18) | `GND` | Masse |
-| **SCK** | **Pin 14** | `GP10 (SPI1 SCK)` | SPI Clock |
-| **MOSI (SI)** | **Pin 15** | `GP11 (SPI1 TX)` | SPI Data In (Modul) / Out (Pico) |
-| **MISO (SO)** | **Pin 16** | `GP12 (SPI1 RX)` | SPI Data Out (Modul) / In (Pico) |
-| **CSn** | **Pin 17** | `GP13` | Chip Select Modul 1 |
-| **GDO0** | **Pin 9** | `GP6` | Demoduliertes Signal (PIO SM0 Flankenerkennung) |
-| *(GDO2)* | **Pin 10** | `GP7` | Optional / Reserve |
+| CC1101 Funktion | Aderfarbe | RP2040 Pin (physisch) | RP2040 GPIO | Beschreibung |
+| :--- | :--- | :--- | :--- | :--- |
+| **VCC** | **Rot (rt)** | **Pin 36** | `3V3(OUT)` | Spannungsversorgung (3.3 V) |
+| **GND** | **Braun (bn)** | **Pin 13** (oder 18) | `GND` | Masse |
+| **SCK** | **Gelb (ge)** | **Pin 14** | `GP10 (SPI1 SCK)` | SPI Clock |
+| **MOSI (SI)** | **Orange (or)** | **Pin 15** | `GP11 (SPI1 TX)` | SPI Data In (Modul) / Out (Pico) |
+| **MISO (SO)** | **Grün (gn)** | **Pin 16** | `GP12 (SPI1 RX)` | SPI Data Out (Modul) / In (Pico) |
+| **CSn** | **Lila (li)** | **Pin 17** | `GP13` | Chip Select Modul 1 |
+| **GDO0** | **Blau (bl)** | **Pin 9** | `GP6` | Demoduliertes Signal (PIO SM0 Flankenerkennung) |
+| *(GDO2)* | *(Grau/frei)* | **Pin 10** | `GP7` | Optional / Reserve |
 
 #### Modul 2: 868 MHz Transceiver (Rechts, SPI0)
-| CC1101 Funktion | RP2040 Pin (physisch) | RP2040 GPIO | Beschreibung |
-| :--- | :--- | :--- | :--- |
-| **VCC** | **Pin 36** | `3V3(OUT)` | Spannungsversorgung (3.3 V) |
-| **GND** | **Pin 23** (oder 28/38) | `GND` | Masse |
-| **MISO (SO)** | **Pin 21** | `GP16 (SPI0 RX)` | SPI Data Out (Modul) / In (Pico) |
-| **CSn** | **Pin 22** | `GP17` | Chip Select Modul 2 |
-| **SCK** | **Pin 24** | `GP18 (SPI0 SCK)` | SPI Clock |
-| **MOSI (SI)** | **Pin 25** | `GP19 (SPI0 TX)` | SPI Data In (Modul) / Out (Pico) |
-| **GDO0** | **Pin 27** | `GP21` | Signal/Sync (PIO SM1 bei OOK oder FSK-Trigger) |
-| *(GDO2)* | **Pin 26** | `GP20` | Optional / Reserve |
+| CC1101 Funktion | Aderfarbe | RP2040 Pin (physisch) | RP2040 GPIO | Beschreibung |
+| :--- | :--- | :--- | :--- | :--- |
+| **VCC** | **Rot (rt)** | **Pin 36** | `3V3(OUT)` | Spannungsversorgung (3.3 V) |
+| **GND** | **Braun (bn)** | **Pin 23** (oder 28/38) | `GND` | Masse |
+| **MISO (SO)** | **Grün (gn)** | **Pin 21** | `GP16 (SPI0 RX)` | SPI Data Out (Modul) / In (Pico) |
+| **CSn** | **Lila (li)** | **Pin 22** | `GP17` | Chip Select Modul 2 |
+| **SCK** | **Gelb (ge)** | **Pin 24** | `GP18 (SPI0 SCK)` | SPI Clock |
+| **MOSI (SI)** | **Orange (or)** | **Pin 25** | `GP19 (SPI0 TX)` | SPI Data In (Modul) / Out (Pico) |
+| **GDO0** | **Blau (bl)** | **Pin 27** | `GP21` | Signal/Sync (PIO SM1 bei OOK oder FSK-Trigger) |
+| *(GDO2)* | *(Grau/frei)* | **Pin 26** | `GP20` | Optional / Reserve |
+
+#### Einheitliche Kabelfarbkodierung (beide Stränge)
+* **VCC:** Rot (`rt`)
+* **GND:** Braun (`bn`)
+* **MOSI (SI):** Orange (`or`)
+* **SCLK:** Gelb (`ge`)
+* **MISO (SO):** Grün (`gn`)
+* **GDO0:** Blau (`bl`)
+* **CSn:** Lila (`li`)
 
 #### Pufferkondensator-Konzept (bei ca. 15 cm Leitungslänge)
 * **Zentraler Puffer:** $1\times 100\,\mu\text{F}$ Elektrolytkondensator direkt am Pico W zwischen `3V3(OUT)` (Pin 36) und `GND`.
