@@ -53,7 +53,7 @@ def pulse_timer():
     push()
     
     label("wrap_start")
-    wrap_end()
+    wrap()
 
 
 class PIOReceiver:
