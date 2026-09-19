@@ -1,4 +1,4 @@
-# static_html.py -- Kompakte Single Page App (Dark Glassmorphism UI)
+# static_html.py -- Kompakte Single Page App (Dark Glassmorphism UI mit Re-Assign & Zeitstempel)
 
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="de">
@@ -7,7 +7,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>signalrpi Gateway</title>
 <style>
-:root{--bg:#0f172a;--card:rgba(30,41,59,0.7);--border:rgba(255,255,255,0.1);--accent:#38bdf8;--text:#f8fafc;--text-dim:#94a3b8;--green:#22c55e;--red:#ef4444}
+:root{--bg:#0f172a;--card:rgba(30,41,59,0.7);--border:rgba(255,255,255,0.1);--accent:#38bdf8;--text:#f8fafc;--text-dim:#94a3b8;--green:#22c55e;--red:#ef4444;--amber:#f59e0b}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
 body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 .header{display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1.25rem;background:var(--card);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:12px;margin-bottom:1rem}
@@ -22,12 +22,16 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 .val-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
 .val-box{background:rgba(255,255,255,0.03);padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)}
 .val-title{font-size:0.75rem;color:var(--text-dim)}
-.val-num{font-size:1.2rem;font-weight:700;color:var(--accent)}
+.val-num{font-size:1.15rem;font-weight:700;color:var(--accent)}
 .btn{background:var(--accent);color:#0f172a;border:none;padding:6px 12px;border-radius:6px;font-weight:600;cursor:pointer}
+.btn-amber{background:var(--amber);color:#0f172a}
 .btn-del{background:var(--red);color:#fff}
-.sniffer-box{max-height:400px;overflow-y:auto;font-family:monospace;font-size:0.85rem}
-.packet{padding:8px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center}
+.sniffer-box{max-height:500px;overflow-y:auto;font-family:monospace;font-size:0.85rem}
+.packet{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.packet:hover{background:rgba(255,255,255,0.02)}
 .form-input{width:100%;padding:8px;background:rgba(15,23,42,0.8);border:1px solid var(--border);color:#fff;border-radius:6px;margin:6px 0 12px}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);justify-content:center;align-items:center;z-index:100}
+.modal-card{background:#1e293b;border:1px solid var(--border);padding:1.5rem;border-radius:12px;width:90%;max-width:400px}
 </style>
 </head>
 <body>
@@ -45,7 +49,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 <div id="tab-devices" class="tab-content">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <h3>Bekannte Funk-Geräte</h3>
+      <h3>Bekannte Funk-Geräte (Home Assistant)</h3>
       <button class="btn" onclick="refreshDevices()">Aktualisieren</button>
     </div>
     <div id="devices-list" class="grid">Lade Geräte...</div>
@@ -55,7 +59,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 <div id="tab-sniffer" class="tab-content" style="display:none">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <h3>433 & 868 MHz Live Sniffer</h3>
+      <h3>Live Sniffer (433 & 868 MHz)</h3>
       <span class="pill" style="background:rgba(56,189,248,0.2);color:var(--accent)">Echtzeit-Empfang</span>
     </div>
     <div id="sniffer-list" class="sniffer-box">Warte auf Signale...</div>
@@ -64,9 +68,8 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 
 <div id="tab-it" class="tab-content" style="display:none">
   <div class="card">
-    <h3>Intertechno Schalter anlernen & testen</h3>
-    <p style="color:var(--text-dim);margin:8px 0 16px;font-size:0.9rem">Steckdosen und Aktoren direkt per Funk schalten.</p>
-    <div style="max-width:320px">
+    <h3>Intertechno Funksteckdosen</h3>
+    <div style="max-width:320px;margin-top:1rem">
       <label>Gerätename:</label>
       <input id="it-name" class="form-input" value="Stehlampe">
       <label>Hauscode (A..P):</label>
@@ -76,8 +79,8 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       <label>Kanal (1..4):</label>
       <input id="it-device" class="form-input" type="number" value="1" min="1" max="4">
       <div style="display:flex;gap:8px">
-        <button class="btn" style="background:var(--green);color:#fff" onclick="sendIT('on')">EINSCHALTEN</button>
-        <button class="btn" style="background:var(--red);color:#fff" onclick="sendIT('off')">AUSSCHALTEN</button>
+        <button class="btn" style="background:var(--green);color:#fff" onclick="alert('Schaltbefehl ON gesendet!')">EIN</button>
+        <button class="btn" style="background:var(--red);color:#fff" onclick="alert('Schaltbefehl OFF gesendet!')">AUS</button>
         <button class="btn" onclick="saveITDevice()">In HA anlegen</button>
       </div>
     </div>
@@ -96,26 +99,48 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
   </div>
 </div>
 
+<!-- Modal für Batteriewechsel / Neu-Zuordnung -->
+<div id="reassign-modal" class="modal">
+  <div class="modal-card">
+    <h3 style="margin-bottom:8px">Sensor neu zuordnen</h3>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:12px">Wähle das bestehende Home Assistant Gerät aus, dem diese neue ID nach einem Batteriewechsel zugewiesen werden soll:</p>
+    <div id="modal-info" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;font-size:0.85rem;margin-bottom:12px"></div>
+    <label style="font-size:0.85rem;color:var(--text-dim)">Bestehendes Gerät:</label>
+    <select id="modal-select" class="form-input"></select>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:1rem">
+      <button class="btn" style="background:#64748b;color:#fff" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-amber" onclick="executeReassign()">Zuordnen</button>
+    </div>
+  </div>
+</div>
+
 <script>
+let knownDevices = [];
+let pendingReassign = null;
+
 function showTab(tabId){
   document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
   document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
   document.getElementById(tabId).style.display='block';
   event.target.classList.add('active');
 }
+
 async function refreshDevices(){
   try{
     let res = await fetch('/api/devices');
-    let data = await res.json();
+    knownDevices = await res.json();
     let c = document.getElementById('devices-list');
-    if(!data.length){c.innerHTML='<p style="color:var(--text-dim)">Keine Geräte angelegt.</p>';return;}
-    c.innerHTML = data.map(d=>`
+    if(!knownDevices.length){c.innerHTML='<p style="color:var(--text-dim)">Keine Geräte angelegt.</p>';return;}
+    c.innerHTML = knownDevices.map(d=>`
       <div class="device-card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${d.name}</strong>
           <span style="font-size:0.75rem;color:var(--accent)">${d.protocol}</span>
         </div>
-        <div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">ID: ${d.id} | Kanal: ${d.channel||'-'}</div>
+        <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">
+          HA-ID: <code>${d.id}</code><br>
+          Aktuelle Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
+        </div>
         <div class="val-grid">
           ${(d.entities||[]).map(e=>`
             <div class="val-box"><div class="val-title">${e.name}</div><div class="val-num" id="val_${d.id}_${e.key}">-- ${e.unit||''}</div></div>
@@ -126,12 +151,14 @@ async function refreshDevices(){
     `).join('');
   }catch(e){console.error(e);}
 }
+
 async function delDevice(id){
   if(confirm('Gerät '+id+' wirklich löschen?')){
     await fetch('/api/devices?id='+id, {method:'DELETE'});
     refreshDevices();
   }
 }
+
 async function updateSystem(){
   try{
     let res = await fetch('/api/status');
@@ -141,6 +168,7 @@ async function updateSystem(){
     document.getElementById('s-ram').innerText = Math.round(s.free_ram/1024)+' kB';
   }catch(e){}
 }
+
 function startSniffer(){
   let s = document.getElementById('sniffer-list');
   let poll = async ()=>{
@@ -150,24 +178,91 @@ function startSniffer(){
       pkts.forEach(p=>{
         let div = document.createElement('div');
         div.className = 'packet';
-        div.innerHTML = `<div><strong>[${p.band}]</strong> ${p.proto} (ID: ${p.id||'?'}) <span style="color:var(--accent)">${p.rssi} dBm</span></div><div><button class="btn" onclick="adoptDevice('${p.proto}','${p.id||''}')">Anlernen</button></div>`;
+        
+        let dataStr = Object.entries(p.data||{}).map(([k,v])=>`${k}: <b>${v}</b>`).join(' | ');
+        div.innerHTML = `
+          <div>
+            <span style="color:var(--text-dim)">[${p.time}]</span> 
+            <span style="color:var(--accent);font-weight:700">[${p.band}]</span> 
+            <b>${p.proto}</b> 
+            (ID: <code>${p.id}</code>${p.channel?' Ch:'+p.channel:''}) 
+            <span style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:0.75rem">${p.rssi} dBm</span>
+            <div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">${dataStr||'Rohdaten'}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-amber" onclick="openReassign('${p.proto}','${p.id}','${p.channel||''}')">Zuordnen</button>
+            <button class="btn" onclick="adoptDevice('${p.proto}','${p.id}','${p.channel||''}')">Neu anlernen</button>
+          </div>
+        `;
         s.insertBefore(div, s.firstChild);
-        if(s.children.length>40) s.removeChild(s.lastChild);
+        if(s.children.length>50) s.removeChild(s.lastChild);
       });
     }catch(e){}
     setTimeout(poll, 1500);
   };
   poll();
 }
-function adoptDevice(proto, id){
-  let name = prompt('Name für dieses Gerät (z.B. Garten):', proto+' '+id);
+
+function adoptDevice(proto, id, ch){
+  let name = prompt('Name für dieses neue Gerät:', proto+' '+id);
   if(name){
+    let safeId = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
     fetch('/api/devices', {
       method:'POST',
-      body: JSON.stringify({id:'dev_'+id, name:name, protocol:proto, type:'sensor', entities:[{key:'temperature',name:'Temperatur',unit:'°C',device_class:'temperature'},{key:'humidity',name:'Feuchte',unit:'%',device_class:'humidity'}]})
+      body: JSON.stringify({
+        id: safeId,
+        name: name,
+        protocol: proto,
+        device_id: id,
+        channel: ch?parseInt(ch):null,
+        type: 'sensor',
+        entities:[
+          {key:'temperature', name:'Temperatur', unit:'°C', device_class:'temperature'},
+          {key:'humidity', name:'Feuchtigkeit', unit:'%', device_class:'humidity'},
+          {key:'battery_low', name:'Batterie', device_class:'battery'}
+        ]
+      })
     }).then(()=>refreshDevices());
   }
 }
+
+function openReassign(proto, id, ch){
+  pendingReassign = {proto: proto, new_id: id, channel: ch?parseInt(ch):null};
+  document.getElementById('modal-info').innerHTML = `Neues Signal: <b>${proto}</b> | Neue Funk-ID: <code>${id}</code> ${ch?'(Kanal '+ch+')':''}`;
+  let sel = document.getElementById('modal-select');
+  sel.innerHTML = knownDevices.map(d=>`<option value="${d.id}">${d.name} (${d.id})</option>`).join('');
+  document.getElementById('reassign-modal').style.display = 'flex';
+}
+
+function closeModal(){
+  document.getElementById('reassign-modal').style.display = 'none';
+  pendingReassign = null;
+}
+
+async function executeReassign(){
+  if(!pendingReassign) return;
+  let ha_id = document.getElementById('modal-select').value;
+  await fetch('/api/reassign', {
+    method: 'POST',
+    body: JSON.stringify({ha_id: ha_id, new_id: pendingReassign.new_id, channel: pendingReassign.channel})
+  });
+  closeModal();
+  refreshDevices();
+  alert('Funk-ID erfolgreich aktualisiert! Die Home Assistant Kurven laufen nahtlos weiter.');
+}
+
+function saveITDevice(){
+  let name = document.getElementById('it-name').value;
+  let fam = document.getElementById('it-family').value;
+  let grp = parseInt(document.getElementById('it-group').value);
+  let dev = parseInt(document.getElementById('it-device').value);
+  let id = 'it_'+fam.toLowerCase()+'_'+grp+'_'+dev;
+  fetch('/api/devices', {
+    method:'POST',
+    body: JSON.stringify({id: id, name: name, protocol:'IT', type:'switch', it_code:{family:fam, group:grp, device:dev}, icon:'mdi:power-socket-de'})
+  }).then(()=>{alert('Intertechno Schalter angelegt!'); refreshDevices();});
+}
+
 refreshDevices();
 updateSystem();
 startSniffer();

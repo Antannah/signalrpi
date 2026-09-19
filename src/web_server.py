@@ -85,6 +85,20 @@ class WebServer:
                     else:
                         writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
 
+            elif url == "/api/reassign" and method == "POST":
+                body = await reader.read(content_len) if content_len > 0 else b"{}"
+                try:
+                    data = json.loads(body.decode("utf-8"))
+                    ha_id = data.get("ha_id")
+                    new_id = data.get("new_id")
+                    new_ch = data.get("channel")
+                    if ha_id and new_id is not None and self.device_manager.reassign_sensor(ha_id, new_id, new_ch):
+                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                    else:
+                        writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
+                except Exception:
+                    writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+
             elif url == "/api/live":
                 # Gibt die neuesten gepufferten Sniffer-Pakete als JSON-Array zurück
                 pkts = []

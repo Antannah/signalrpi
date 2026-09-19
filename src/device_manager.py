@@ -49,6 +49,20 @@ class DeviceManager:
             self.publish_discovery(dev)
         return True
 
+    def reassign_sensor(self, ha_id, new_dev_id, new_channel=None):
+        """
+        Ordnet eine neue Funk-ID (nach Batteriewechsel) einem bestehenden Sensor zu.
+        Die Home Assistant Entity-ID bleibt unverändert!
+        """
+        for dev in self.devices:
+            if dev.get("id") == ha_id:
+                dev["device_id"] = new_dev_id
+                if new_channel is not None:
+                    dev["channel"] = new_channel
+                self.save()
+                return True
+        return False
+
     def delete(self, dev_id):
         new_list = [d for d in self.devices if d.get("id") != dev_id]
         if len(new_list) != len(self.devices):
