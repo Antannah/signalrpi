@@ -141,6 +141,7 @@ if has_config:
     print("-> Starte asynchrone Tasks (Funkempfang, MQTT, Web)...")
 
     async def radio_loop():
+        gc_counter = 0
         while True:
             # Eventuelle MQTT-Nachrichten abfragen
             if client:
@@ -245,8 +246,11 @@ if has_config:
                         topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
                         client.publish(topic, json.dumps(decoded))
                         
-            # Kleiner Yield für Kooperatives Multitasking
+            # Kleiner Yield für Kooperatives Multitasking & periodische GC gegen Fragmentierung
             await asyncio.sleep_ms(1)
+            if gc_counter % 200 == 0:
+                gc.collect()
+            gc_counter += 1
 
     async def main_async():
         await web_srv.start()
