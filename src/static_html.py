@@ -219,7 +219,7 @@ async function refreshDevices(){
           </div>
           <div class="val-grid">
             ${(d.entities||[]).map(e=>{
-              let val = d.last_values ? d.last_values[e.key] : null;
+              let val = (d.latest && d.latest[e.key] !== undefined) ? d.latest[e.key] : (d.last_values ? d.last_values[e.key] : null);
               return `
                 <div class="val-box">
                   <div class="val-title">${e.name}</div>
@@ -229,7 +229,7 @@ async function refreshDevices(){
             }).join('')}
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
-            <span style="font-size:0.75rem;color:var(--text-dim)">${d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Noch kein Empfang'}</span>
+            <span style="font-size:0.75rem;color:var(--text-dim)">${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</span>
             <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">Löschen</button>
           </div>
         </div>
@@ -533,6 +533,7 @@ refreshDevices();
 updateSystem();
 startSniffer();
 setInterval(updateSystem, 5000);
+setInterval(refreshDevices, 3000);
 </script>
 </body>
 </html>

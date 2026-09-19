@@ -182,7 +182,14 @@ class DeviceManager:
     def set_latest(self, dev_id, data):
         if not hasattr(self, "latest_values"):
             self.latest_values = {}
-        self.latest_values[dev_id] = data
+        d_val = dict(data)
+        try:
+            import time
+            t = time.localtime()
+            d_val["_time"] = "{:02d}:{:02d}:{:02d}".format(t[3], t[4], t[5])
+        except Exception:
+            pass
+        self.latest_values[dev_id] = d_val
 
     def match_and_get_info(self, decoded_data):
         # Prüft, ob ein empfangenes Funkpaket zu einem konfigurierten Gerät passt
