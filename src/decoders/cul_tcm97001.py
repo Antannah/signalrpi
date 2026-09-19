@@ -15,24 +15,32 @@ class DecoderTCM97001(BaseDecoder):
         - Bit 0: ca. 500 us High + 2000 us Low
         - Bit 1: ca. 500 us High + 4000 us Low
         """
+        # Suche nach einer zusammenhängenden Folge von 36 Datenbits
         bits = []
-        for i in range(0, len(pulses) - 1, 2):
+        i = 0
+        while i < len(pulses) - 1:
             high = pulses[i]
             low = pulses[i+1]
             
-            # Überprüfe High-Puls (Soll: ~500 us)
-            if 250 <= high <= 850:
-                # Überprüfe Low-Phase
-                if 1500 <= low <= 2800:
+            # High-Puls: ca. 350 .. 750 µs
+            if 300 <= high <= 800:
+                if 1400 <= low <= 2600:
                     bits.append(0)
-                elif 3000 <= low <= 5200:
+                    i += 2
+                    continue
+                elif 3100 <= low <= 4800:
                     bits.append(1)
-                elif 7000 <= low <= 11000:
-                    # Sync-Puls: Ignoriere und fahre fort
-                    pass
+                    i += 2
+                    continue
+            
+            # Kein Treffer: wenn wir noch keine 36 Bits haben, Puffer zurücksetzen und weitersuchen
+            if len(bits) < 36:
+                bits = []
+            elif len(bits) >= 36:
+                break
+            i += 1
         
-        # Ein korrektes NC_WS Paket hat genau 36 Datenbits
-        if len(bits) != 36:
+        if len(bits) < 36:
             return None
             
         # Bits in Hex-String umwandeln (9 Hex-Zeichen)
