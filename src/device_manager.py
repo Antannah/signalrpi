@@ -35,6 +35,10 @@ class DeviceManager:
         if not dev_id:
             return False
         
+        # Standardmäßig aktiviert, falls nicht angegeben
+        if "enabled" not in dev:
+            dev["enabled"] = True
+            
         found = False
         for i, existing in enumerate(self.devices):
             if existing.get("id") == dev_id:
@@ -46,8 +50,27 @@ class DeviceManager:
             
         self.save()
         if self.mqtt_client:
-            self.publish_discovery(dev)
+            if dev.get("enabled", True):
+                self.publish_discovery(dev)
+            else:
+                self.remove_discovery(dev_id)
         return True
+
+    def toggle_enabled(self, ha_id, state=None):
+        for dev in self.devices:
+            if dev.get("id") == ha_id:
+                if state is None:
+                    dev["enabled"] = not dev.get("enabled", True)
+                else:
+                    dev["enabled"] = bool(state)
+                self.save()
+                if self.mqtt_client:
+                    if dev["enabled"]:
+                        self.publish_discovery(dev)
+                    else:
+                        self.remove_discovery(ha_id)
+                return True, dev["enabled"]
+        return False, False
 
     def reassign_sensor(self, ha_id, new_dev_id, new_channel=None):
         """
@@ -77,10 +100,11 @@ class DeviceManager:
         if not self.mqtt_client:
             return
         for dev in self.devices:
-            self.publish_discovery(dev)
+            if dev.get("enabled", True):
+                self.publish_discovery(dev)
 
     def publish_discovery(self, dev):
-        if not self.mqtt_client:
+        if not self.mqtt_client or not dev.get("enabled", True):
             return
             
         dev_id = dev["id"]
@@ -181,10 +205,11 @@ class DeviceManager:
             
             # Treffer: Letzte Werte merken
             self.set_latest(dev["id"], data)
-            return dev["id"], dev.get("name", dev["id"])
+            is_enabled = dev.get("enabled", True)
+            return dev["id"], dev.get("name", dev["id"]), is_enabled
             
-        return None, None
+        return None, None, False
 
     def match_and_get_id(self, decoded_data):
-        dev_id, _ = self.match_and_get_info(decoded_data)
-        return dev_id
+        dev_id, _, is_enabled = self.match_and_get_info(decoded_data)
+        return dev_id if is_enabled else None

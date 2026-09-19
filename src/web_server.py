@@ -85,6 +85,20 @@ class WebServer:
                     else:
                         writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
 
+            elif url.startswith("/api/devices/toggle") and method == "POST":
+                body = await reader.read(content_len) if content_len > 0 else b"{}"
+                try:
+                    data = json.loads(body.decode("utf-8"))
+                    ha_id = data.get("id")
+                    ok, new_state = self.device_manager.toggle_enabled(ha_id)
+                    if ok:
+                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
+                        writer.write(json.dumps({"ok": True, "enabled": new_state}).encode("utf-8"))
+                    else:
+                        writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
+                except Exception:
+                    writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+
             elif url == "/api/reassign" and method == "POST":
                 body = await reader.read(content_len) if content_len > 0 else b"{}"
                 try:
@@ -106,6 +120,43 @@ class WebServer:
                     pkts.append(self.sniffer_queue.pop(0))
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
                 writer.write(json.dumps(pkts).encode("utf-8"))
+
+            elif url == "/api/ota" and method == "POST":
+                # GitHub OTA Update anstoßen
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"status\":\"started\"}")
+                await writer.drain()
+                await writer.aclose()
+                try:
+                    import ota_updater
+                    ota_updater.update_from_github()
+                except Exception as ex:
+                    print("OTA Trigger Fehler:", ex)
+                return
+
+            elif url.startswith("/api/upload") and method == "POST":
+                # Datei-Upload: Ziel-Dateiname aus Query Parameter ?filename=...
+                filename = "uploaded_file.py"
+                if "?filename=" in url:
+                    filename = url.split("?filename=")[1].split("&")[0]
+                
+                # Sanitize filename (keine unerlaubten Pfade)
+                filename = filename.replace("..", "").lstrip("/")
+                
+                try:
+                    # Lese Dateiinhalt blockweise
+                    remaining = content_len
+                    with open(filename, "wb") as f:
+                        while remaining > 0:
+                            chunk_size = min(remaining, 512)
+                            chunk = await reader.read(chunk_size)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            remaining -= len(chunk)
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                except Exception as ex:
+                    print("Upload Fehler:", ex)
+                    writer.write(b"HTTP/1.1 500 Server Error\r\nConnection: close\r\n\r\n")
 
             else:
                 writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\nNot Found")

@@ -97,6 +97,55 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       <div class="val-box"><div class="val-title">MQTT Broker</div><div class="val-num" id="s-mqtt">Verbunden</div></div>
     </div>
   </div>
+
+  <div class="card">
+    <h3>🚀 Firmware & OTA Updates</h3>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin:8px 0 16px">Aktualisiere den Pico W kabellos direkt über GitHub oder flashe einzelne Dateien.</p>
+    
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem">
+      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+        <h4 style="color:var(--accent);margin-bottom:8px">1. GitHub OTA Update</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lädt den neuesten Stand des Haupt-Branches von GitHub herunter und startet neu.</p>
+        <button class="btn" onclick="triggerGitHubOTA()" id="btn-ota">Jetzt von GitHub aktualisieren</button>
+        <div id="ota-status" style="font-size:0.8rem;margin-top:8px;color:var(--amber)"></div>
+      </div>
+
+      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+        <h4 style="color:var(--accent);margin-bottom:8px">2. Datei-Upload (Lokal)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lade eine geänderte .py Datei direkt vom Rechner in das Pico-Dateisystem hoch.</p>
+        <input type="file" id="file-upload-input" style="font-size:0.8rem;margin-bottom:8px;color:var(--text-dim)">
+        <button class="btn btn-amber" onclick="uploadFile()">Datei hochladen</button>
+        <div id="upload-status" style="font-size:0.8rem;margin-top:8px;color:var(--green)"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal für generisches Sensor-Anlernen & Konfiguration -->
+<div id="config-modal" class="modal">
+  <div class="modal-card" style="max-width:500px">
+    <h3 style="margin-bottom:8px">⚙ Sensor anlernen & konfigurieren</h3>
+    <div id="cfg-modal-info" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;font-size:0.85rem;margin-bottom:12px"></div>
+    
+    <label style="font-size:0.8rem;color:var(--text-dim)">Gerätename:</label>
+    <input id="cfg-name" class="form-input" type="text" placeholder="z.B. Wohnzimmer Thermometer">
+    
+    <label style="font-size:0.8rem;color:var(--text-dim)">Erkannte Messwerte / Entitäten:</label>
+    <div id="cfg-entities-list" style="margin:8px 0 16px;display:flex;flex-direction:column;gap:8px"></div>
+    
+    <div style="margin-bottom:16px;background:rgba(255,255,255,0.03);padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem">
+        <input type="checkbox" id="cfg-enabled" checked style="width:18px;height:18px">
+        <b>Für Home Assistant / MQTT sofort freigeben</b>
+      </label>
+      <div style="font-size:0.75rem;color:var(--text-dim);margin-left:26px;margin-top:2px">Ist dies deaktiviert, empfängt signalrpi die Daten nur intern und sendet nichts an MQTT.</div>
+    </div>
+    
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" style="background:#64748b;color:#fff" onclick="closeConfigModal()">Abbrechen</button>
+      <button class="btn" onclick="saveConfiguredDevice()">Speichern</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal für Batteriewechsel / Neu-Zuordnung -->
@@ -149,33 +198,53 @@ async function refreshDevices(){
     knownDevices = await res.json();
     let c = document.getElementById('devices-list');
     if(!knownDevices.length){c.innerHTML='<p style="color:var(--text-dim)">Keine Geräte angelegt.</p>';return;}
-    c.innerHTML = knownDevices.map(d=>`
-      <div class="device-card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong>${d.name}</strong>
-          <span style="font-size:0.75rem;color:var(--accent)">${d.protocol}</span>
+    c.innerHTML = knownDevices.map(d=>{
+      let isEn = d.enabled !== false;
+      let toggleBadge = isEn 
+        ? `<button class="btn" style="background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">MQTT: Aktiv</button>`
+        : `<button class="btn" style="background:rgba(239,68,68,0.2);color:var(--red);padding:2px 8px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">MQTT: Pausiert</button>`;
+
+      return `
+        <div class="device-card" style="opacity:${isEn ? '1':'0.7'}">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>${d.name}</strong>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${toggleBadge}
+              <span style="font-size:0.75rem;color:var(--accent)">${d.protocol}</span>
+            </div>
+          </div>
+          <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">
+            HA-ID: <code>${d.id}</code><br>
+            Aktuelle Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
+          </div>
+          <div class="val-grid">
+            ${(d.entities||[]).map(e=>{
+              let val = d.last_values ? d.last_values[e.key] : null;
+              return `
+                <div class="val-box">
+                  <div class="val-title">${e.name}</div>
+                  <div class="val-num">${val!==null && val!==undefined ? val+(e.unit?' '+e.unit:'') : '--'}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <span style="font-size:0.75rem;color:var(--text-dim)">${d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Noch kein Empfang'}</span>
+            <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">Löschen</button>
+          </div>
         </div>
-        <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">
-          HA-ID: <code>${d.id}</code><br>
-          Aktuelle Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
-        </div>
-        <div class="val-grid">
-          ${(d.entities||[]).map(e=>{
-            let val = d.last_values ? d.last_values[e.key] : null;
-            return `
-              <div class="val-box">
-                <div class="val-title">${e.name}</div>
-                <div class="val-num">${val!==null && val!==undefined ? val+(e.unit?' '+e.unit:'') : '--'}</div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
-          <span style="font-size:0.75rem;color:var(--text-dim)">${d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Noch kein Empfang'}</span>
-          <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">Löschen</button>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
+  }catch(e){}
+}
+
+async function toggleDevice(id){
+  try{
+    let res = await fetch('/api/devices/toggle', {
+      method: 'POST',
+      body: JSON.stringify({id: id})
+    });
+    refreshDevices();
   }catch(e){}
 }
 
@@ -216,7 +285,7 @@ function startSniffer(){
         let rawBtn = p.raw ? `<button class="btn" style="background:#475569;color:#fff" onclick='openRawModal(${JSON.stringify(p)})'>🔬 Rohdaten</button>` : '';
         let reassignBtn = p.proto!=='RAW_433' && p.proto!=='RAW_868_OOK' && p.proto!=='RAW_868_FSK' 
           ? `<button class="btn btn-amber" onclick="openReassign('${p.proto}','${p.id}','${p.channel||''}')">Zuordnen</button>
-             <button class="btn" onclick="adoptDevice('${p.proto}','${p.id}','${p.channel||''}')">Neu anlernen</button>` 
+             <button class="btn" onclick='openAdoptModal(${JSON.stringify(p)})'>Neu anlernen</button>` 
           : '';
 
         div.innerHTML = `
@@ -283,27 +352,98 @@ function copyRaw(fmt){
   });
 }
 
-function adoptDevice(proto, id, ch){
-  let name = prompt('Name für dieses neue Gerät:', proto+' '+id);
-  if(name){
-    let safeId = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    fetch('/api/devices', {
-      method:'POST',
-      body: JSON.stringify({
-        id: safeId,
-        name: name,
-        protocol: proto,
-        device_id: id,
-        channel: ch?parseInt(ch):null,
-        type: 'sensor',
-        entities:[
-          {key:'temperature', name:'Temperatur', unit:'°C', device_class:'temperature'},
-          {key:'humidity', name:'Feuchtigkeit', unit:'%', device_class:'humidity'},
-          {key:'battery_low', name:'Batterie', device_class:'battery'}
-        ]
-      })
-    }).then(()=>refreshDevices());
+function openAdoptModal(pkt){
+  pendingAdoptPacket = pkt;
+  document.getElementById('cfg-modal-info').innerHTML = `
+    <b>Protokoll:</b> ${pkt.proto} | <b>Funk-ID:</b> <code>${pkt.id}</code> ${pkt.channel ? '| <b>Kanal:</b> '+pkt.channel : ''}
+  `;
+  document.getElementById('cfg-name').value = pkt.proto + ' ' + pkt.id;
+  
+  // Dynamische Entitätenerkennung aus pkt.data
+  let listEl = document.getElementById('cfg-entities-list');
+  listEl.innerHTML = '';
+  
+  let entries = Object.entries(pkt.data || {});
+  if(!entries.length){
+    entries = [['state', '1']];
   }
+  
+  entries.forEach(([key, val])=>{
+    let unit = '';
+    let devClass = 'sensor';
+    let defName = key;
+    
+    if(key === 'temperature') { unit = '°C'; devClass = 'temperature'; defName = 'Temperatur'; }
+    else if(key === 'humidity') { unit = '%'; devClass = 'humidity'; defName = 'Luftfeuchtigkeit'; }
+    else if(key === 'battery_low') { unit = ''; devClass = 'battery'; defName = 'Batterie Status'; }
+    else if(key === 'wind_speed') { unit = 'km/h'; devClass = 'wind_speed'; defName = 'Windgeschwindigkeit'; }
+    else if(key === 'rain') { unit = 'mm'; devClass = 'precipitation'; defName = 'Niederschlag'; }
+    else if(key === 'state' || key === 'contact') { unit = ''; devClass = 'door'; defName = 'Zustand'; }
+    
+    let row = document.createElement('div');
+    row.className = 'cfg-ent-row';
+    row.style = 'display:grid;grid-template-columns:24px 1fr 1fr 80px;gap:6px;align-items:center;background:rgba(255,255,255,0.02);padding:6px;border-radius:6px';
+    row.innerHTML = `
+      <input type="checkbox" checked class="ent-enable" data-key="${key}" style="width:16px;height:16px">
+      <input type="text" class="ent-name form-input" style="margin:0;padding:4px 8px;font-size:0.8rem" value="${defName}" placeholder="Name">
+      <input type="text" class="ent-unit form-input" style="margin:0;padding:4px 8px;font-size:0.8rem" value="${unit}" placeholder="Einheit">
+      <select class="ent-class form-input" style="margin:0;padding:4px 4px;font-size:0.75rem">
+        <option value="sensor" ${devClass!=='battery'?'selected':''}>Sensor</option>
+        <option value="binary_sensor" ${devClass==='battery'?'selected':''}>Binär</option>
+      </select>
+    `;
+    listEl.appendChild(row);
+  });
+  
+  document.getElementById('config-modal').style.display = 'flex';
+}
+
+function closeConfigModal(){
+  document.getElementById('config-modal').style.display = 'none';
+  pendingAdoptPacket = null;
+}
+
+async function saveConfiguredDevice(){
+  if(!pendingAdoptPacket) return;
+  let name = document.getElementById('cfg-name').value.trim();
+  if(!name) { alert('Bitte einen Namen angeben'); return; }
+  
+  let safeId = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  let isEnabled = document.getElementById('cfg-enabled').checked;
+  
+  let entities = [];
+  document.querySelectorAll('.cfg-ent-row').forEach(row=>{
+    let cb = row.querySelector('.ent-enable');
+    if(cb && cb.checked){
+      let key = cb.getAttribute('data-key');
+      let entName = row.querySelector('.ent-name').value.trim() || key;
+      let unit = row.querySelector('.ent-unit').value.trim();
+      let cls = row.querySelector('.ent-class').value;
+      let entObj = {key: key, name: entName, device_class: cls};
+      if(unit) entObj.unit = unit;
+      entities.push(entObj);
+    }
+  });
+  
+  let payload = {
+    id: safeId,
+    name: name,
+    protocol: pendingAdoptPacket.proto,
+    device_id: pendingAdoptPacket.id,
+    channel: pendingAdoptPacket.channel ? parseInt(pendingAdoptPacket.channel) : null,
+    type: 'sensor',
+    enabled: isEnabled,
+    entities: entities
+  };
+  
+  await fetch('/api/devices', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  
+  closeConfigModal();
+  refreshDevices();
+  alert('Gerät "'+name+'" wurde erfolgreich angelegt' + (isEnabled ? ' und für Home Assistant/MQTT freigegeben!' : ' (MQTT pausiert).'));
 }
 
 function openReassign(proto, id, ch){
@@ -339,8 +479,54 @@ function saveITDevice(){
   let id = 'it_'+fam.toLowerCase()+'_'+grp+'_'+dev;
   fetch('/api/devices', {
     method:'POST',
-    body: JSON.stringify({id: id, name: name, protocol:'IT', type:'switch', it_code:{family:fam, group:grp, device:dev}, icon:'mdi:power-socket-de'})
+    body: JSON.stringify({id: id, name: name, protocol:'IT', type:'switch', it_code:{family:fam, group:grp, device:dev}, icon:'mdi:power-socket-de', enabled:true})
   }).then(()=>{alert('Intertechno Schalter angelegt!'); refreshDevices();});
+}
+
+async function triggerGitHubOTA(){
+  if(!confirm('GitHub OTA Update jetzt starten? Der Pico lädt die Dateien herunter und startet neu.')) return;
+  let btn = document.getElementById('btn-ota');
+  let st = document.getElementById('ota-status');
+  btn.disabled = true;
+  st.innerText = 'OTA Download läuft... Bitte ca. 10 Sekunden warten.';
+  try{
+    await fetch('/api/ota', {method:'POST'});
+    st.innerText = 'Pico startet neu... Verbinde in 5s neu...';
+    setTimeout(()=>{ location.reload(); }, 6000);
+  }catch(e){
+    st.innerText = 'Fehler beim Auslösen des OTA Updates.';
+    btn.disabled = false;
+  }
+}
+
+async function uploadFile(){
+  let input = document.getElementById('file-upload-input');
+  let st = document.getElementById('upload-status');
+  if(!input.files || !input.files[0]){
+    alert('Bitte zuerst eine Datei auswählen!');
+    return;
+  }
+  let file = input.files[0];
+  st.innerText = 'Lade ' + file.name + ' hoch...';
+  try{
+    let reader = new FileReader();
+    reader.onload = async function(e){
+      let content = e.target.result;
+      let res = await fetch('/api/upload?filename='+encodeURIComponent(file.name), {
+        method: 'POST',
+        body: content
+      });
+      if(res.ok){
+        st.innerText = 'Datei ' + file.name + ' erfolgreich geflasht!';
+        alert('Datei erfolgreich hochgeladen!');
+      } else {
+        st.innerText = 'Fehler beim Hochladen.';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }catch(e){
+    st.innerText = 'Upload fehlgeschlagen: ' + e;
+  }
 }
 
 refreshDevices();

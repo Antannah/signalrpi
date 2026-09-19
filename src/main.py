@@ -86,6 +86,17 @@ if has_config:
             client.set_last_will("signalrpi/status", '{"state": "offline"}', retain=True, qos=1)
             client.connect()
             client.publish("signalrpi/status", '{"state": "online"}', retain=True, qos=1)
+            
+            # Callback für Fernsteuerungs-Kommandos (OTA Update)
+            def mqtt_callback(topic, msg):
+                t_str = topic.decode("utf-8") if isinstance(topic, bytes) else str(topic)
+                if t_str == "signalrpi/system/ota_update":
+                    print("MQTT OTA Update Befehl empfangen!")
+                    import ota_updater
+                    ota_updater.update_from_github()
+            
+            client.set_callback(mqtt_callback)
+            client.subscribe("signalrpi/system/ota_update")
             print("MQTT erfolgreich verbunden!")
         except Exception as e:
             print("MQTT-Verbindungsfehler:", e)
@@ -131,15 +142,22 @@ if has_config:
 
     async def radio_loop():
         while True:
+            # Eventuelle MQTT-Nachrichten abfragen
+            if client:
+                try:
+                    client.check_msg()
+                except Exception:
+                    pass
+
             # 433 MHz Paketprüfung
             packet_433 = rx_433.get_packet()
             if packet_433:
                 rssi = cc_433.get_rssi()
                 decoded = decoders.decode_signal(packet_433)
                 
-                matched_ha_id, matched_name = (None, None)
+                matched_ha_id, matched_name, is_enabled = (None, None, False)
                 if decoded:
-                    matched_ha_id, matched_name = device_mgr.match_and_get_info(decoded)
+                    matched_ha_id, matched_name, is_enabled = device_mgr.match_and_get_info(decoded)
                     
                 proto_name = decoded["protocol"] if decoded else "RAW_433"
                 dev_id_str = str(decoded["device_id"]) if decoded else "-"
@@ -161,8 +179,8 @@ if has_config:
                             }
                             client.publish(topic, json.dumps(payload))
                             
-                            # 2. Falls einem konfigurierten HA-Device zugeordnet -> HA State Topic
-                            if matched_ha_id:
+                            # 2. Falls einem konfigurierten HA-Device zugeordnet & freigegeben -> HA State Topic
+                            if matched_ha_id and is_enabled:
                                 ha_topic = "signalrpi/devices/{}/state".format(matched_ha_id)
                                 client.publish(ha_topic, json.dumps(decoded["data"]))
                         else:
