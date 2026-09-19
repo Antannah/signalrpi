@@ -142,9 +142,10 @@ async function refreshDevices(){
           Aktuelle Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
         </div>
         <div class="val-grid">
-          ${(d.entities||[]).map(e=>`
-            <div class="val-box"><div class="val-title">${e.name}</div><div class="val-num" id="val_${d.id}_${e.key}">-- ${e.unit||''}</div></div>
-          `).join('')}
+          ${(d.entities||[]).map(e=>{
+            let cur = (d.latest && d.latest[e.key] !== undefined) ? d.latest[e.key] : '--';
+            return `<div class="val-box"><div class="val-title">${e.name}</div><div class="val-num" id="val_${d.id}_${e.key}">${cur} ${e.unit||''}</div></div>`;
+          }).join('')}
         </div>
         <button class="btn btn-del" onclick="delDevice('${d.id}')">Löschen</button>
       </div>

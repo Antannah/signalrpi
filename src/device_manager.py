@@ -146,21 +146,41 @@ class DeviceManager:
         except Exception:
             pass
 
+    def get_all(self):
+        # Gib Geräte angereichert mit den letzten Messwerten zurück
+        res = []
+        for dev in self.devices:
+            d_copy = dict(dev)
+            d_copy["latest"] = getattr(self, "latest_values", {}).get(dev["id"], {})
+            res.append(d_copy)
+        return res
+
+    def set_latest(self, dev_id, data):
+        if not hasattr(self, "latest_values"):
+            self.latest_values = {}
+        self.latest_values[dev_id] = data
+
     def match_and_get_id(self, decoded_data):
         # Prüft, ob ein empfangenes Funkpaket zu einem konfigurierten Gerät passt
         proto = decoded_data.get("protocol")
-        dev_id_val = decoded_data.get("device_id")
+        dev_id_val = str(decoded_data.get("device_id"))
         data = decoded_data.get("data", {})
         channel = data.get("channel")
         
         for dev in self.devices:
             if dev.get("protocol") != proto:
                 continue
-            # Optionaler Filter auf channel oder feste device_id
-            if "channel" in dev and channel is not None and dev["channel"] != channel:
-                continue
-            if "device_id" in dev and dev["device_id"] != dev_id_val:
-                continue
+            # Optionaler Filter auf channel
+            if "channel" in dev and dev["channel"] is not None and channel is not None:
+                if str(dev["channel"]) != str(channel):
+                    continue
+            # Filter auf device_id
+            if "device_id" in dev and dev["device_id"] is not None:
+                if str(dev["device_id"]) != dev_id_val:
+                    continue
+            
+            # Treffer: Letzte Werte merken
+            self.set_latest(dev["id"], data)
             return dev["id"]
             
         return None
