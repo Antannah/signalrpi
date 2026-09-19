@@ -51,134 +51,177 @@ if has_config:
         # State Machine 1 für 868 MHz (GDO0 an GP21)
         rx_868 = PIOReceiver(sm_id=1, pin_num=21)
     
-    # 4. MQTT-Verbindung aufbauen
+    # 4. WLAN-Verbindung herstellen
+    import network
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    if not wlan.isconnected():
+        print("Verbinde mit WLAN '{}'...".format(config.WIFI_SSID))
+        wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
+        timeout = 25
+        while not wlan.isconnected() and timeout > 0:
+            time.sleep(0.5)
+            timeout -= 1
+            
+    if wlan.isconnected():
+        ip = wlan.ifconfig()[0]
+        print("WLAN erfolgreich verbunden! IP-Adresse:", ip)
+    else:
+        print("Warnung: WLAN-Verbindung fehlgeschlagen!")
+
+    # 5. MQTT-Verbindung aufbauen
     print("Verbinde mit MQTT-Broker: {}...".format(config.MQTT_BROKER))
     client = None
-    try:
-        client = MQTTClient(
-            config.MQTT_CLIENT_ID,
-            config.MQTT_BROKER,
-            port=config.MQTT_PORT,
-            user=config.MQTT_USER,
-            password=config.MQTT_PASSWORD,
-            keepalive=60
-        )
-        # Last Will and Testament für Statusüberwachung
-        client.set_last_will("signalrpi/status", '{"state": "offline"}', retain=True, qos=1)
-        client.connect()
-        client.publish("signalrpi/status", '{"state": "online"}', retain=True, qos=1)
-        print("MQTT erfolgreich verbunden!")
-    except Exception as e:
-        print("MQTT-Verbindungsfehler:", e)
-        # Das Programm läuft trotzdem weiter und gibt Rohwerte im Serial Terminal aus
+    if wlan.isconnected():
+        try:
+            client = MQTTClient(
+                config.MQTT_CLIENT_ID,
+                config.MQTT_BROKER,
+                port=config.MQTT_PORT,
+                user=config.MQTT_USER,
+                password=config.MQTT_PASSWORD,
+                keepalive=60
+            )
+            # Last Will and Testament für Statusüberwachung
+            client.set_last_will("signalrpi/status", '{"state": "offline"}', retain=True, qos=1)
+            client.connect()
+            client.publish("signalrpi/status", '{"state": "online"}', retain=True, qos=1)
+            print("MQTT erfolgreich verbunden!")
+        except Exception as e:
+            print("MQTT-Verbindungsfehler:", e)
+    else:
+        print("MQTT übersprungen (kein WLAN).")
         
-    print("\nsignalrpi ist betriebsbereit und scannt den Äther...")
-    
-    # Hauptschleife
-    while True:
-        # 433 MHz Paketprüfung
-        packet_433 = rx_433.get_packet()
-        if packet_433:
-            rssi = cc_433.get_rssi()
-            print("[433 MHz] Signal empfangen (RSSI: {:.1f} dBm, Pulses: {}): {}".format(
-                rssi, len(packet_433), packet_433
-            ))
-            
-            # Dekodierungsversuch
-            decoded = decoders.decode_signal(packet_433)
-            
-            # Publizieren
-            if client:
-                try:
-                    if decoded:
+    # 6. Device Manager & Home Assistant Auto-Discovery
+    from device_manager import DeviceManager
+    device_mgr = DeviceManager(mqtt_client=client)
+    if client:
+        print("Sende Home Assistant Auto-Discovery für bekannte Geräte...")
+        device_mgr.publish_all_discovery()
+
+    # Puffer für Live-Sniffer im Webinterface (max 30 Pakete)
+    sniffer_queue = []
+
+    def push_sniffer(band, proto, dev_id, rssi):
+        if len(sniffer_queue) > 30:
+            sniffer_queue.pop(0)
+        sniffer_queue.append({
+            "band": band,
+            "proto": proto,
+            "id": dev_id,
+            "rssi": round(rssi, 1)
+        })
+
+    # 7. Asynchroner Webserver starten
+    import uasyncio as asyncio
+    from web_server import WebServer
+    web_srv = WebServer(device_manager=device_mgr, sniffer_queue=sniffer_queue, wlan=wlan, port=80)
+
+    print("\nsignalrpi ist betriebsbereit!")
+    if wlan.isconnected():
+        print("-> Web-Dashboard erreichbar unter: http://{}".format(wlan.ifconfig()[0]))
+    print("-> Starte asynchrone Tasks (Funkempfang, MQTT, Web)...")
+
+    async def radio_loop():
+        while True:
+            # 433 MHz Paketprüfung
+            packet_433 = rx_433.get_packet()
+            if packet_433:
+                rssi = cc_433.get_rssi()
+                decoded = decoders.decode_signal(packet_433)
+                
+                proto_name = decoded["protocol"] if decoded else "RAW_433"
+                dev_id_str = str(decoded["device_id"]) if decoded else "-"
+                push_sniffer("433 MHz", proto_name, dev_id_str, rssi)
+                
+                if client:
+                    try:
+                        if decoded:
+                            # 1. Standard SignalDUINO Message Topic
+                            topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
+                            payload = {
+                                "protocol": decoded["protocol"],
+                                "device_id": decoded["device_id"],
+                                "data": decoded["data"],
+                                "signal": {"rssi": rssi, "pulses": len(packet_433)}
+                            }
+                            client.publish(topic, json.dumps(payload))
+                            
+                            # 2. Falls einem konfigurierten HA-Device zugeordnet -> HA State Topic
+                            matched_ha_id = device_mgr.match_and_get_id(decoded)
+                            if matched_ha_id:
+                                ha_topic = "signalrpi/devices/{}/state".format(matched_ha_id)
+                                client.publish(ha_topic, json.dumps(decoded["data"]))
+                        else:
+                            client.publish("signalrpi/raw/433", json.dumps({
+                                "rssi": rssi,
+                                "pulses": packet_433
+                            }))
+                    except Exception as ex:
+                        # Bei Verbindungsabbruch (ECONNRESET) einmal versuchen neu zu verbinden
+                        try:
+                            client.connect()
+                        except Exception:
+                            pass
+                        
+            # 868 MHz Paketprüfung
+            if mode_868 == "FSK":
+                packet_868 = cc_868.read_fsk_packet()
+                if packet_868:
+                    payload = packet_868[:14]
+                    rssi_val = packet_868[14]
+                    rssi = (rssi_val - 256) / 2.0 - 74.0 if rssi_val >= 128 else (rssi_val / 2.0) - 74.0
+                    decoded = decoders.decode_fsk_packet(payload)
+                    
+                    proto_name = decoded["protocol"] if decoded else "RAW_868_FSK"
+                    dev_id_str = str(decoded["device_id"]) if decoded else payload[:4].hex().upper()
+                    push_sniffer("868 MHz", proto_name, dev_id_str, rssi)
+                    
+                    if client:
+                        try:
+                            if decoded:
+                                topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
+                                payload_data = {
+                                    "protocol": decoded["protocol"],
+                                    "device_id": decoded["device_id"],
+                                    "data": decoded["data"],
+                                    "signal": {"rssi": rssi, "raw_len": len(payload)}
+                                }
+                                client.publish(topic, json.dumps(payload_data))
+                                
+                                matched_ha_id = device_mgr.match_and_get_id(decoded)
+                                if matched_ha_id:
+                                    ha_topic = "signalrpi/devices/{}/state".format(matched_ha_id)
+                                    client.publish(ha_topic, json.dumps(decoded["data"]))
+                            else:
+                                client.publish("signalrpi/raw/868", json.dumps({
+                                    "rssi": rssi,
+                                    "raw": payload.hex().upper()
+                                }))
+                        except Exception as ex:
+                            print("MQTT-Sende-Fehler 868 FSK:", ex)
+            else:
+                packet_868 = rx_868.get_packet()
+                if packet_868:
+                    rssi = cc_868.get_rssi()
+                    decoded = decoders.decode_signal(packet_868)
+                    proto_name = decoded["protocol"] if decoded else "RAW_868_OOK"
+                    dev_id_str = str(decoded["device_id"]) if decoded else "-"
+                    push_sniffer("868 MHz", proto_name, dev_id_str, rssi)
+                    if client and decoded:
                         topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
-                        payload = {
-                            "protocol": decoded["protocol"],
-                            "device_id": decoded["device_id"],
-                            "data": decoded["data"],
-                            "signal": {"rssi": rssi, "pulses": len(packet_433)}
-                        }
-                        client.publish(topic, json.dumps(payload))
-                    else:
-                        # Raw-Ausgabe für unbekannte Signale
-                        client.publish("signalrpi/raw/433", json.dumps({
-                            "rssi": rssi,
-                            "pulses": packet_433
-                        }))
-                except Exception as ex:
-                    print("Fehler beim MQTT-Senden (433 MHz):", ex)
-                    
-        # 868 MHz Paketprüfung
-        if mode_868 == "FSK":
-            packet_868 = cc_868.read_fsk_packet()
-            if packet_868:
-                payload = packet_868[:14]
-                rssi_val = packet_868[14]
-                # RSSI aus den CC1101-Statusbytes berechnen
-                if rssi_val >= 128:
-                    rssi = (rssi_val - 256) / 2.0 - 74.0
-                else:
-                    rssi = (rssi_val / 2.0) - 74.0
-                    
-                print("[868 MHz] FSK Signal empfangen (RSSI: {:.1f} dBm): {}".format(
-                    rssi, payload.hex().upper()
-                ))
-                
-                # Dekodierungsversuch
-                decoded = decoders.decode_fsk_packet(payload)
-                
-                # Publizieren
-                if client:
-                    try:
-                        if decoded:
-                            topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
-                            payload_data = {
-                                "protocol": decoded["protocol"],
-                                "device_id": decoded["device_id"],
-                                "data": decoded["data"],
-                                "signal": {"rssi": rssi, "raw_len": len(payload)}
-                            }
-                            client.publish(topic, json.dumps(payload_data))
-                        else:
-                            # Raw-Ausgabe für unbekannte FSK-Signale
-                            client.publish("signalrpi/raw/868", json.dumps({
-                                "rssi": rssi,
-                                "raw": payload.hex().upper()
-                            }))
-                    except Exception as ex:
-                        print("Fehler beim MQTT-Senden (868 MHz FSK):", ex)
-        else:
-            # OOK Modus (asynchron über PIOReceiver)
-            packet_868 = rx_868.get_packet()
-            if packet_868:
-                rssi = cc_868.get_rssi()
-                print("[868 MHz] OOK Signal empfangen (RSSI: {:.1f} dBm, Pulses: {}): {}".format(
-                    rssi, len(packet_868), packet_868
-                ))
-                
-                # Dekodierungsversuch
-                decoded = decoders.decode_signal(packet_868)
-                
-                # Publizieren
-                if client:
-                    try:
-                        if decoded:
-                            topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])
-                            payload_data = {
-                                "protocol": decoded["protocol"],
-                                "device_id": decoded["device_id"],
-                                "data": decoded["data"],
-                                "signal": {"rssi": rssi, "pulses": len(packet_868)}
-                            }
-                            client.publish(topic, json.dumps(payload_data))
-                        else:
-                            # Raw-Ausgabe für unbekannte Signale
-                            client.publish("signalrpi/raw/868", json.dumps({
-                                "rssi": rssi,
-                                "pulses": packet_868
-                            }))
-                    except Exception as ex:
-                        print("Fehler beim MQTT-Senden (868 MHz OOK):", ex)
-                    
+                        client.publish(topic, json.dumps(decoded))
+                        
+            # Kleiner Yield für Kooperatives Multitasking
+            await asyncio.sleep_ms(1)
+
+    async def main_async():
+        await web_srv.start()
+        await radio_loop()
+
+    try:
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        print("\nProgramm durch Benutzer beendet.")
         # Kurze Pause zur Vermeidung von CPU-Volllast und zum Einlassen von Interrupts
         time.sleep_us(200)

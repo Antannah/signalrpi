@@ -1,0 +1,14 @@
+[
+  {
+    "id": "balkon_wetter",
+    "name": "Balkon Wetter",
+    "protocol": "CUL_TCM97001",
+    "channel": 1,
+    "type": "sensor",
+    "entities": [
+      {"key": "temperature", "name": "Temperatur", "unit": "°C", "device_class": "temperature"},
+      {"key": "humidity", "name": "Luftfeuchtigkeit", "unit": "%", "device_class": "humidity"},
+      {"key": "battery_low", "name": "Batterie schwach", "device_class": "battery"}
+    ]
+  }
+]
