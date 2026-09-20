@@ -234,7 +234,7 @@ async function refreshDevices(){
             HA-ID: <code>${d.id}</code> | Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
           </div>
           <div class="val-grid">
-            ${(d.entities||[]).map(e=>{
+            ${(d.entities||[]).filter(e => e.key !== 'channel' && e.key !== 'forced_send').map(e=>{
               let val = (d.latest && d.latest[e.key] !== undefined) ? d.latest[e.key] : (d.last_values ? d.last_values[e.key] : null);
               return `
                 <div class="val-box">
@@ -402,7 +402,7 @@ function openAdoptModal(pkt){
   let listEl = document.getElementById('cfg-entities-list');
   listEl.innerHTML = '';
   
-  let entries = Object.entries(pkt.data || {});
+  let entries = Object.entries(pkt.data || {}).filter(([k,v]) => k !== 'channel' && k !== 'forced_send');
   if(!entries.length){
     entries = [['state', '1']];
   }
