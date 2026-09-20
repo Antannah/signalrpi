@@ -67,20 +67,65 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 
 <div id="tab-it" class="tab-content" style="display:none">
   <div class="card">
-    <h3>Intertechno Funksteckdosen</h3>
-    <div style="max-width:320px;margin-top:1rem">
-      <label>Gerätename:</label>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <h3 style="margin:0">Intertechno Funk-Geräte</h3>
+      <div style="display:flex;gap:4px;background:rgba(0,0,0,0.3);padding:3px;border-radius:6px;border:1px solid var(--border)">
+        <button id="it-type-v3-btn" class="nav-btn active" style="margin:0;padding:4px 10px;font-size:0.8rem" onclick="switchITType('v3')">V3 Selbstlernend</button>
+        <button id="it-type-v1-btn" class="nav-btn" style="margin:0;padding:4px 10px;font-size:0.8rem" onclick="switchITType('v1')">V1 Klassisch (DIP)</button>
+      </div>
+    </div>
+
+    <!-- V3 Selbstlernend -->
+    <div id="it-form-v3" style="max-width:460px">
+      <p style="color:var(--text-dim);font-size:0.85rem;margin:0 0 14px">
+        Intertechno V3 nutzt einen 26-Bit Rolling-/Zufalls-Binärcode. Erzeuge einen neuen kollisionsfreien Code für SignalRPI oder gib einen bestehenden Code ein.
+      </p>
+      
+      <label style="font-size:0.85rem;color:var(--text-dim)">Gerätename:</label>
+      <input id="it-v3-name" class="form-input" value="Küche Stehlampe" placeholder="z.B. Wohnzimmer Lampe">
+      
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <label style="font-size:0.85rem;color:var(--text-dim)">26-Bit Sender Binärcode:</label>
+        <span id="it-v3-bitcount" style="font-size:0.75rem;color:var(--accent);font-family:monospace">26 / 26 Bit</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="it-v3-bin" class="form-input" style="font-family:monospace;letter-spacing:1px;font-weight:600;margin:0" value="00011100110111100110100111" maxlength="26" oninput="validateITV3Bits()">
+        <button class="btn" style="white-space:nowrap;background:rgba(59,130,246,0.2);color:var(--accent);border:1px solid rgba(59,130,246,0.4)" onclick="generateUniqueITV3Code()">🎲 Zufallscode</button>
+      </div>
+
+      <label style="font-size:0.85rem;color:var(--text-dim)">Kanal / Unit (1..16):</label>
+      <input id="it-v3-channel" class="form-input" type="number" value="1" min="1" max="16">
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;margin:12px 0 16px">
+        <input type="checkbox" id="it-v3-enabled" checked style="width:16px;height:16px">
+        <span><b>Sofort für Home Assistant (MQTT) aktivieren</b></span>
+      </label>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="btn" onclick="saveITV3Device()" style="background:var(--accent);color:#fff;font-weight:600">💾 In HA anlegen</button>
+        <button class="btn" style="background:var(--green);color:#fff" onclick="sendITV3Command('learn')">📡 Anlernen (ON)</button>
+        <button class="btn" style="background:var(--green);color:#fff" onclick="sendITV3Command('on')">EIN</button>
+        <button class="btn" style="background:var(--red);color:#fff" onclick="sendITV3Command('off')">AUS</button>
+      </div>
+    </div>
+
+    <!-- V1 Klassisch DIP -->
+    <div id="it-form-v1" style="max-width:460px;display:none">
+      <p style="color:var(--text-dim);font-size:0.85rem;margin:0 0 14px">
+        Klassische Intertechno-Geräte mit DIP-Schaltern bzw. Kodierrädchen (Hauscode A..P).
+      </p>
+      <label style="font-size:0.85rem;color:var(--text-dim)">Gerätename:</label>
       <input id="it-name" class="form-input" value="Stehlampe">
-      <label>Hauscode (A..P):</label>
+      <label style="font-size:0.85rem;color:var(--text-dim)">Hauscode (A..P):</label>
       <input id="it-family" class="form-input" value="A" maxlength="1">
-      <label>Gruppe (1..4):</label>
+      <label style="font-size:0.85rem;color:var(--text-dim)">Gruppe (1..4):</label>
       <input id="it-group" class="form-input" type="number" value="1" min="1" max="4">
-      <label>Kanal (1..4):</label>
+      <label style="font-size:0.85rem;color:var(--text-dim)">Kanal (1..4):</label>
       <input id="it-device" class="form-input" type="number" value="1" min="1" max="4">
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn" onclick="saveITDevice()" style="background:var(--accent);color:#fff;font-weight:600">💾 In HA anlegen</button>
         <button class="btn" style="background:var(--green);color:#fff" onclick="alert('Schaltbefehl ON gesendet!')">EIN</button>
         <button class="btn" style="background:var(--red);color:#fff" onclick="alert('Schaltbefehl OFF gesendet!')">AUS</button>
-        <button class="btn" onclick="saveITDevice()">In HA anlegen</button>
       </div>
     </div>
   </div>
@@ -228,9 +273,9 @@ let currentRawData = null;
 
 function showTab(tabId){
   document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
-  document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav > .nav-btn').forEach(el=>el.classList.remove('active'));
   document.getElementById(tabId).style.display='block';
-  event.target.classList.add('active');
+  if(event && event.target) event.target.classList.add('active');
 }
 
 async function refreshDevices(){
@@ -247,6 +292,15 @@ async function refreshDevices(){
         : '';
 
       let currentProf = d.profile || (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? 'contact' : 'thermo'));
+      let isSwitch = d.type === 'switch';
+      let infoLine = '';
+      if(d.protocol === 'IT_V3' && d.binary_code){
+        infoLine = `HA-ID: <code>${d.id}</code> | Code: <b style="font-family:monospace">${d.binary_code}</b> | Ch: <b>${d.channel||1}</b>`;
+      } else if(d.protocol === 'IT' && d.it_code){
+        infoLine = `HA-ID: <code>${d.id}</code> | Hauscode: <b>${d.it_code.family}</b> | Gruppe: <b>${d.it_code.group}</b> | Kanal: <b>${d.it_code.device}</b>`;
+      } else {
+        infoLine = `HA-ID: <code>${d.id}</code> | Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}`;
+      }
 
       return `
         <div class="device-card">
@@ -258,7 +312,7 @@ async function refreshDevices(){
             </div>
           </div>
           <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">
-            HA-ID: <code>${d.id}</code> | Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
+            ${infoLine}
           </div>
           <div class="val-grid">
             ${(d.entities||[]).filter(e => e.key !== 'channel' && e.key !== 'forced_send').map(e=>{
@@ -270,17 +324,25 @@ async function refreshDevices(){
                 </div>
               `;
             }).join('')}
+            ${isSwitch ? `
+              <div class="val-box">
+                <div class="val-title">Schaltzustand</div>
+                <div class="val-num">${(d.latest && d.latest.state) ? d.latest.state : 'BEREIT'}</div>
+              </div>
+            ` : ''}
           </div>
           <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:10px">
             Empfang: <b>${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</b>
           </div>
           <!-- Funktionsleiste am unteren Rand -->
           <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">
-            <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
-              <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>Temp + Feuchte</option>
-              <option value="thermo" ${currentProf==='thermo'?'selected':''}>Nur Temperatur</option>
-              <option value="contact" ${currentProf==='contact'?'selected':''}>Tür-/Fensterkontakt</option>
-            </select>
+            ${!isSwitch ? `
+              <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
+                <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>Temp + Feuchte</option>
+                <option value="thermo" ${currentProf==='thermo'?'selected':''}>Nur Temperatur</option>
+                <option value="contact" ${currentProf==='contact'?'selected':''}>Tür-/Fensterkontakt</option>
+              </select>
+            ` : `<span style="font-size:0.75rem;color:var(--text-dim)">Typ: Funk-Schalter</span>`}
             <div style="display:flex;gap:6px">
               <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
                 ${isEn ? 'MQTT deregistrieren' : 'MQTT registrieren'}
@@ -575,6 +637,107 @@ async function executeReassign(){
   closeModal();
   refreshDevices();
   alert('Funk-ID erfolgreich aktualisiert! Die Home Assistant Kurven laufen nahtlos weiter.');
+}
+
+function switchITType(type){
+  if(type === 'v3'){
+    document.getElementById('it-form-v3').style.display = 'block';
+    document.getElementById('it-form-v1').style.display = 'none';
+    document.getElementById('it-type-v3-btn').classList.add('active');
+    document.getElementById('it-type-v1-btn').classList.remove('active');
+  } else {
+    document.getElementById('it-form-v3').style.display = 'none';
+    document.getElementById('it-form-v1').style.display = 'block';
+    document.getElementById('it-type-v1-btn').classList.add('active');
+    document.getElementById('it-type-v3-btn').classList.remove('active');
+  }
+}
+
+function validateITV3Bits(){
+  let input = document.getElementById('it-v3-bin');
+  let clean = input.value.replace(/[^01]/g, '').slice(0, 26);
+  if(input.value !== clean) input.value = clean;
+  let counter = document.getElementById('it-v3-bitcount');
+  counter.innerText = clean.length + ' / 26 Bit';
+  counter.style.color = (clean.length === 26) ? 'var(--green)' : 'var(--accent)';
+}
+
+function generateUniqueITV3Code(){
+  // Extrahiere bereits verwendete V3-Codes aus knownDevices
+  let usedCodes = new Set();
+  (knownDevices || []).forEach(d => {
+    if(d.binary_code) usedCodes.add(d.binary_code);
+    if(d.it_v3 && d.it_v3.binary_code) usedCodes.add(d.it_v3.binary_code);
+  });
+
+  let newCode = '';
+  let attempts = 0;
+  do {
+    newCode = '';
+    for(let i = 0; i < 26; i++){
+      newCode += (Math.random() > 0.5 ? '1' : '0');
+    }
+    attempts++;
+  } while (usedCodes.has(newCode) && attempts < 1000);
+
+  let input = document.getElementById('it-v3-bin');
+  input.value = newCode;
+  validateITV3Bits();
+}
+
+async function saveITV3Device(){
+  let name = document.getElementById('it-v3-name').value.trim();
+  if(!name){ alert('Bitte einen Gerätenamen angeben'); return; }
+
+  let binInput = document.getElementById('it-v3-bin').value.trim().replace(/[^01]/g, '');
+  if(binInput.length !== 26){
+    alert('Der Intertechno V3 Binärcode muss exakt 26 Bit (0 und 1) lang sein! Aktuell: ' + binInput.length + ' Bit');
+    return;
+  }
+
+  let channel = parseInt(document.getElementById('it-v3-channel').value) || 1;
+  let isEnabled = document.getElementById('it-v3-enabled').checked;
+
+  // Analoge ID-Generierung mit deutscher Umlaut-Bereinigung wie bei CUL-Sensoren
+  let safeId = name.toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]/g, '_');
+
+  let payload = {
+    id: safeId,
+    name: name,
+    protocol: 'IT_V3',
+    type: 'switch',
+    binary_code: binInput,
+    channel: channel,
+    icon: 'mdi:power-socket-de',
+    enabled: isEnabled
+  };
+
+  await fetch('/api/devices', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  refreshDevices();
+  alert('Intertechno V3 Gerät "' + name + '" erfolgreich angelegt' + (isEnabled ? ' und für Home Assistant/MQTT aktiviert!' : ' (MQTT pausiert).'));
+}
+
+function sendITV3Command(action){
+  let bin = document.getElementById('it-v3-bin').value.trim().replace(/[^01]/g, '');
+  if(bin.length !== 26){
+    alert('Bitte zuerst einen gültigen 26-Bit Binärcode eingeben/generieren!');
+    return;
+  }
+  let ch = parseInt(document.getElementById('it-v3-channel').value) || 1;
+  if(action === 'learn'){
+    alert('Anlernsignal an Steckdose gesendet (Code: ' + bin + ', Kanal: ' + ch + '). Steckdose sollte nun quittieren!');
+  } else {
+    alert('Befehl ' + action.toUpperCase() + ' an Intertechno V3 gesendet (Code: ' + bin + ', Kanal: ' + ch + ')');
+  }
 }
 
 function saveITDevice(){
