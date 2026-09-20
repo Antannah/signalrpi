@@ -214,11 +214,9 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
     <h3 id="cfg-modal-title" style="margin-bottom:8px">⚙ Sensor anlernen & konfigurieren</h3>
     <div id="cfg-modal-info" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;font-size:0.85rem;margin-bottom:12px"></div>
     
-    <label style="font-size:0.8rem;color:var(--text-dim)">Gerätename (Anzeige in HA & Web):</label>
-    <input id="cfg-name" class="form-input" type="text" placeholder="z.B. Wohnzimmer Thermometer" oninput="onCfgNameInput()">
-    
-    <label style="font-size:0.8rem;color:var(--text-dim)">Home Assistant ID (eindeutige Geräte-ID):</label>
-    <input id="cfg-ha-id" class="form-input" type="text" placeholder="z.B. wohnzimmer_thermometer" style="margin-bottom:10px">
+    <label style="font-size:0.8rem;color:var(--text-dim)">Gerätename (identisch in signalrpi & Home Assistant):</label>
+    <input id="cfg-name" class="form-input" type="text" placeholder="z.B. kueche2 oder ferdi" oninput="onCfgNameInput()" style="margin-bottom:4px">
+    <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:12px">ID / Topic: <code id="cfg-ha-id-preview" style="color:var(--accent)">-</code></div>
     
     <label style="font-size:0.8rem;color:var(--text-dim)">Gerätetyp / Funktion:</label>
     <select id="cfg-type-select" class="form-input" style="margin-bottom:12px" onchange="onCfgTypeChange()">
@@ -449,15 +447,23 @@ function resetITV1Form(){
   document.getElementById('it-v1-cancel-btn').style.display = 'none';
 }
 
+function sanitizeDeviceName(str){
+  if(!str) return '';
+  return str
+    .replace(/ä/g, 'ae').replace(/Ä/g, 'ae')
+    .replace(/ö/g, 'oe').replace(/Ö/g, 'oe')
+    .replace(/ü/g, 'ue').replace(/Ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .toLowerCase();
+}
+
 function onCfgNameInput(){
-  let editId = document.getElementById('cfg-edit-id').value.trim();
-  // Wenn es ein Neuanlernen ist, automatisch die HA-ID vorschlagen
-  if(!editId){
-    let n = document.getElementById('cfg-name').value.trim();
-    document.getElementById('cfg-ha-id').value = n.toLowerCase()
-      .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
-      .replace(/[^a-z0-9]/g, '_');
-  }
+  let input = document.getElementById('cfg-name');
+  let clean = sanitizeDeviceName(input.value);
+  let preview = document.getElementById('cfg-ha-id-preview');
+  if(preview) preview.innerText = clean || '-';
 }
 
 function openEditSensorModal(dev){
@@ -469,12 +475,12 @@ function openEditSensorModal(dev){
     editDev: dev
   };
   document.getElementById('cfg-edit-id').value = dev.id;
-  document.getElementById('cfg-ha-id').value = dev.id;
   document.getElementById('cfg-modal-title').innerText = '⚙ Sensor bearbeiten';
   document.getElementById('cfg-modal-info').innerHTML = `
     <b>Protokoll:</b> ${dev.protocol} | <b>Funk-ID:</b> <code>${dev.device_id}</code> ${dev.channel ? '| <b>Kanal:</b> '+dev.channel : ''}
   `;
-  document.getElementById('cfg-name').value = dev.name;
+  document.getElementById('cfg-name').value = dev.name || dev.id;
+  onCfgNameInput();
   let typeSel = document.getElementById('cfg-type-select');
   if(typeSel){
     typeSel.value = dev.profile || (dev.type === 'switch' ? 'switch' : (dev.protocol === 'IT' ? 'button' : 'sensor'));
@@ -767,19 +773,15 @@ function closeConfigModal(){
 
 async function saveConfiguredDevice(){
   if(!pendingAdoptPacket) return;
-  let name = document.getElementById('cfg-name').value.trim();
-  if(!name) { showToast('Bitte einen Namen angeben', 'error'); return; }
+  let rawName = document.getElementById('cfg-name').value.trim();
+  if(!rawName) { showToast('Bitte einen Namen angeben', 'error'); return; }
   
+  // Sonderzeichen bereinigen: Name und ID sind identisch ohne Sonderzeichen
+  let cleanName = sanitizeDeviceName(rawName);
+  let safeId = cleanName;
+
   let editId = document.getElementById('cfg-edit-id').value.trim();
   let existingDev = editId ? (knownDevices || []).find(d => d.id === editId) : null;
-
-  let customHaId = document.getElementById('cfg-ha-id').value.trim();
-  let safeId = customHaId || editId || name.toLowerCase()
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9]/g, '_');
 
   // Falls sich die ID geändert hat (Umbenennung), altes Gerät und alte HA-Topics sauber entfernen
   if(editId && editId !== safeId){
@@ -810,7 +812,7 @@ async function saveConfiguredDevice(){
   
   let payload = {
     id: safeId,
-    name: name,
+    name: cleanName,
     protocol: pendingAdoptPacket.proto,
     device_id: pendingAdoptPacket.id,
     channel: pendingAdoptPacket.channel ? parseInt(pendingAdoptPacket.channel) : null,
@@ -932,8 +934,10 @@ function generateUniqueITV3Code(){
 }
 
 async function saveITV3Device(){
-  let name = document.getElementById('it-v3-name').value.trim();
-  if(!name){ showToast('Bitte einen Gerätenamen angeben', 'error'); return; }
+  let rawName = document.getElementById('it-v3-name').value.trim();
+  if(!rawName){ showToast('Bitte einen Gerätenamen angeben', 'error'); return; }
+  let cleanName = sanitizeDeviceName(rawName);
+  let safeId = cleanName;
 
   let binInput = document.getElementById('it-v3-bin').value.trim().replace(/[^01]/g, '');
   if(binInput.length !== 26){
@@ -947,21 +951,17 @@ async function saveITV3Device(){
   let editId = document.getElementById('it-v3-edit-id').value.trim();
   let existingDev = editId ? (knownDevices || []).find(d => d.id === editId) : null;
 
-  // Analoge ID-Generierung mit deutscher Umlaut-Bereinigung wie bei CUL-Sensoren
-  let safeId = editId || name.toLowerCase()
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9]/g, '_');
+  if(editId && editId !== safeId){
+    try {
+      await fetch('/api/devices?id=' + encodeURIComponent(editId), {method: 'DELETE'});
+    } catch(e){}
+  }
 
-  // Zweistufig: Standardmäßig false (erst via "MQTT registrieren" scharf schalten),
-  // bei Bearbeitung bleibt der Zustand erhalten.
   let isEnabled = existingDev ? (existingDev.enabled !== false) : false;
 
   let payload = {
     id: safeId,
-    name: name,
+    name: cleanName,
     protocol: 'IT_V3',
     type: 'switch',
     binary_code: binInput,
@@ -1089,8 +1089,10 @@ async function sendDeviceSwitch(id, action){
 }
 
 async function saveITDevice(){
-  let name = document.getElementById('it-name').value.trim();
-  if(!name){ showToast('Bitte einen Gerätenamen angeben', 'error'); return; }
+  let rawName = document.getElementById('it-name').value.trim();
+  if(!rawName){ showToast('Bitte einen Gerätenamen angeben', 'error'); return; }
+  let cleanName = sanitizeDeviceName(rawName);
+  let safeId = cleanName;
   let fam = document.getElementById('it-family').value.toUpperCase();
   let grp = parseInt(document.getElementById('it-group').value) || 1;
   let dev = parseInt(document.getElementById('it-device').value) || 1;
@@ -1099,12 +1101,11 @@ async function saveITDevice(){
   let editId = document.getElementById('it-v1-edit-id').value.trim();
   let existingDev = editId ? (knownDevices || []).find(d => d.id === editId) : null;
 
-  let safeId = editId || name.toLowerCase()
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9]/g, '_');
+  if(editId && editId !== safeId){
+    try {
+      await fetch('/api/devices?id=' + encodeURIComponent(editId), {method: 'DELETE'});
+    } catch(e){}
+  }
 
   let isEnabled = existingDev ? (existingDev.enabled !== false) : false;
 
@@ -1114,7 +1115,7 @@ async function saveITDevice(){
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         id: safeId, 
-        name: name, 
+        name: cleanName, 
         protocol:'IT', 
         type:'switch', 
         device_id: fam + '_' + grp + '_' + dev,
