@@ -99,6 +99,19 @@ class WebServer:
                 except Exception:
                     writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
 
+            elif url.startswith("/api/devices/profile") and method == "POST":
+                body = await reader.read(content_len) if content_len > 0 else b"{}"
+                try:
+                    data = json.loads(body.decode("utf-8"))
+                    ha_id = data.get("id")
+                    profile = data.get("profile")
+                    if ha_id and profile and self.device_manager.set_device_profile(ha_id, profile):
+                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                    else:
+                        writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
+                except Exception:
+                    writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+
             elif url == "/api/reassign" and method == "POST":
                 body = await reader.read(content_len) if content_len > 0 else b"{}"
                 try:

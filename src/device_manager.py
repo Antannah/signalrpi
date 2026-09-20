@@ -56,6 +56,41 @@ class DeviceManager:
                 self.remove_discovery(dev_id)
         return True
 
+    def set_device_profile(self, ha_id, profile_name):
+        """
+        Ändert das Entitäten-Profil eines Geräts (z.B. thermo_hygro, thermo, contact)
+        und aktualisiert ggf. das MQTT Auto-Discovery.
+        """
+        for dev in self.devices:
+            if dev.get("id") == ha_id:
+                # Vorherige Entitäten abmelden, falls MQTT aktiv
+                if self.mqtt_client and dev.get("enabled", True):
+                    self.remove_discovery(ha_id)
+                
+                dev["profile"] = profile_name
+                if profile_name == "thermo_hygro":
+                    dev["entities"] = [
+                        {"key": "temperature", "name": "Temperatur", "unit": "°C", "device_class": "temperature"},
+                        {"key": "humidity", "name": "Luftfeuchtigkeit", "unit": "%", "device_class": "humidity"},
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
+                    ]
+                elif profile_name == "thermo":
+                    dev["entities"] = [
+                        {"key": "temperature", "name": "Temperatur", "unit": "°C", "device_class": "temperature"},
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
+                    ]
+                elif profile_name == "contact":
+                    dev["entities"] = [
+                        {"key": "state", "name": "Zustand", "device_class": "door"},
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
+                    ]
+                
+                self.save()
+                if self.mqtt_client and dev.get("enabled", True):
+                    self.publish_discovery(dev)
+                return True
+        return False
+
     def toggle_enabled(self, ha_id, state=None):
         for dev in self.devices:
             if dev.get("id") == ha_id:

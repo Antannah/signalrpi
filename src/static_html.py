@@ -200,22 +200,24 @@ async function refreshDevices(){
     if(!knownDevices.length){c.innerHTML='<p style="color:var(--text-dim)">Keine Geräte angelegt.</p>';return;}
     c.innerHTML = knownDevices.map(d=>{
       let isEn = d.enabled !== false;
-      let toggleBadge = isEn 
-        ? `<button class="btn" style="background:#22c55e;color:#0f172a;font-weight:700;padding:4px 12px;border-radius:6px;box-shadow:0 0 10px rgba(34,197,94,0.4)" onclick="toggleDevice('${d.id}')">MQTT: AKTIV</button>`
-        : `<button class="btn" style="background:#ef4444;color:#ffffff;font-weight:700;padding:4px 12px;border-radius:6px;box-shadow:0 0 10px rgba(239,68,68,0.4)" onclick="toggleDevice('${d.id}')">MQTT: PAUSIERT</button>`;
+      // MQTT-Badge wird oben NUR angezeigt, wenn MQTT aktiv ist (transparentes Grün)
+      let mqttBadge = isEn 
+        ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">MQTT</span>`
+        : '';
+
+      let currentProf = d.profile || (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? 'contact' : 'thermo'));
 
       return `
-        <div class="device-card" style="border-left: 4px solid ${isEn ? '#22c55e' : '#ef4444'};">
+        <div class="device-card">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <strong style="font-size:1.05rem">${d.name}</strong>
-            <div style="display:flex;gap:8px;align-items:center">
-              ${toggleBadge}
+            <div style="display:flex;gap:6px;align-items:center">
+              ${mqttBadge}
               <span style="font-size:0.75rem;color:var(--accent);font-weight:600">${d.protocol}</span>
             </div>
           </div>
           <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">
-            HA-ID: <code>${d.id}</code><br>
-            Aktuelle Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
+            HA-ID: <code>${d.id}</code> | Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}
           </div>
           <div class="val-grid">
             ${(d.entities||[]).map(e=>{
@@ -228,13 +230,36 @@ async function refreshDevices(){
               `;
             }).join('')}
           </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
-            <span style="font-size:0.75rem;color:var(--text-dim)">${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</span>
-            <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">Löschen</button>
+          <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:10px">
+            Empfang: <b>${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</b>
+          </div>
+          <!-- Funktionsleiste am unteren Rand -->
+          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">
+            <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
+              <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>Temp + Feuchte</option>
+              <option value="thermo" ${currentProf==='thermo'?'selected':''}>Nur Temperatur</option>
+              <option value="contact" ${currentProf==='contact'?'selected':''}>Tür-/Fensterkontakt</option>
+            </select>
+            <div style="display:flex;gap:6px">
+              <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
+                ${isEn ? 'Inaktivieren' : 'In MQTT aktivieren'}
+              </button>
+              <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">Löschen</button>
+            </div>
           </div>
         </div>
       `;
     }).join('');
+  }catch(e){}
+}
+
+async function changeDeviceProfile(id, profile){
+  try{
+    await fetch('/api/devices/profile', {
+      method: 'POST',
+      body: JSON.stringify({id: id, profile: profile})
+    });
+    refreshDevices();
   }catch(e){}
 }
 
