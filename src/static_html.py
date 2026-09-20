@@ -124,9 +124,15 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       <label style="font-size:0.85rem;color:var(--text-dim)">Gruppe (1..4):</label>
       <input id="it-group" class="form-input" type="number" value="1" min="1" max="4">
       <label style="font-size:0.85rem;color:var(--text-dim)">Kanal (1..4):</label>
-      <input id="it-device" class="form-input" type="number" value="1" min="1" max="4">
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="btn" onclick="saveITDevice()" style="background:var(--accent);color:#fff;font-weight:600">💾 In HA anlegen</button>
+      <input id="it-device" class="form-input" type="number" value="1" min="1" max="4" style="margin-bottom:8px">
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;margin:10px 0 16px">
+        <input type="checkbox" id="it-v1-enabled" checked style="width:16px;height:16px">
+        <span><b>Sofort für Home Assistant (MQTT) aktivieren</b></span>
+      </label>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="btn" onclick="saveITDevice()" style="background:var(--accent);color:#fff;font-weight:600">💾 Anlegen</button>
         <button class="btn" style="background:var(--green);color:#fff" onclick="alert('Schaltbefehl ON gesendet!')">EIN</button>
         <button class="btn" style="background:var(--red);color:#fff" onclick="alert('Schaltbefehl OFF gesendet!')">AUS</button>
       </div>
@@ -758,16 +764,35 @@ function sendITV3Command(action){
   }
 }
 
-function saveITDevice(){
-  let name = document.getElementById('it-name').value;
-  let fam = document.getElementById('it-family').value;
-  let grp = parseInt(document.getElementById('it-group').value);
-  let dev = parseInt(document.getElementById('it-device').value);
-  let id = 'it_'+fam.toLowerCase()+'_'+grp+'_'+dev;
-  fetch('/api/devices', {
+async function saveITDevice(){
+  let name = document.getElementById('it-name').value.trim();
+  if(!name){ alert('Bitte einen Gerätenamen angeben'); return; }
+  let fam = document.getElementById('it-family').value.toUpperCase();
+  let grp = parseInt(document.getElementById('it-group').value) || 1;
+  let dev = parseInt(document.getElementById('it-device').value) || 1;
+  let isEnabled = document.getElementById('it-v1-enabled').checked;
+
+  let safeId = name.toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]/g, '_');
+
+  await fetch('/api/devices', {
     method:'POST',
-    body: JSON.stringify({id: id, name: name, protocol:'IT', type:'switch', it_code:{family:fam, group:grp, device:dev}, icon:'mdi:power-socket-de', enabled:true})
-  }).then(()=>{alert('Intertechno Schalter angelegt!'); refreshDevices();});
+    body: JSON.stringify({
+      id: safeId, 
+      name: name, 
+      protocol:'IT', 
+      type:'switch', 
+      it_code:{family:fam, group:grp, device:dev}, 
+      icon:'mdi:power-socket-de', 
+      enabled: isEnabled
+    })
+  });
+  refreshDevices();
+  alert('Intertechno V1 Schalter "' + name + '" angelegt' + (isEnabled ? ' und für Home Assistant/MQTT aktiviert!' : ' (MQTT pausiert).'));
 }
 
 async function triggerGitHubOTA(){
