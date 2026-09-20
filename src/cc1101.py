@@ -34,10 +34,12 @@ CC1101_BSCFG    = 0x1A  # Bit Synchronization Configuration
 CC1101_AGCCTRL2 = 0x1B  # AGC Control
 CC1101_AGCCTRL1 = 0x1C  # AGC Control
 CC1101_AGCCTRL0 = 0x1D  # AGC Control
+CC1101_FREND0   = 0x22  # Front End TX Configuration
 CC1101_FSCAL3   = 0x23  # Frequency Synthesizer Calibration
 CC1101_FSCAL2   = 0x24  # Frequency Synthesizer Calibration
 CC1101_FSCAL1   = 0x25  # Frequency Synthesizer Calibration
 CC1101_FSCAL0   = 0x26  # Frequency Synthesizer Calibration
+CC1101_PATABLE  = 0x3E  # PA Table Control (8 Bytes)
 
 # CC1101 Status Registers (Read-only, require ORing with 0xC0)
 CC1101_RSSI     = 0x34  # Received Signal Strength Indicator
@@ -173,8 +175,22 @@ class CC1101:
         self._write_reg(CC1101_FSCAL1, 0x00)
         self._write_reg(CC1101_FSCAL0, 0x1F)
         
-        # 7. Aktiviere den Empfänger
+        # 7. Sendeleistung für ASK/OOK konfigurieren:
+        # Für ASK/OOK wählt FREND0 PA_POWER=1 (Index 1 der PATABLE für High, Index 0 für Low/0x00).
+        # PATABLE Index 0 = 0x00 (Sender aus bei Low), Index 1 = 0xC0 (+10 dBm Sendeleistung bei High).
+        self._write_reg(CC1101_FREND0, 0x11)
+        self.set_pa_table(bytearray([0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
+        
+        # 8. Aktiviere den Empfänger
         self.enable_rx()
+
+    def set_pa_table(self, patable: bytearray) -> None:
+        """Schreibt die 8-Byte Sendeleistungs-Tabelle (PATABLE)."""
+        self.cs_pin.value(0)
+        # MSB=0 (Write), Burst=1 (0x40) -> 0x7E
+        self.spi.write(bytearray([CC1101_PATABLE | 0x40]))
+        self.spi.write(patable)
+        self.cs_pin.value(1)
 
     def enable_rx(self) -> None:
         """Versetzt den CC1101 in den Empfangsmodus (RX)."""
@@ -213,10 +229,15 @@ class CC1101:
         # 3. Den Pico-GPIO temporär als Ausgang schalten (Start mit Low)
         gdo0_pin.init(mode=Pin.OUT, value=0)
         
-        # 4. CC1101 in den TX-Modus schalten
+        # 4. CC1101 in den TX-Modus schalten und auf Synthesizer-Lock warten
         self._write_strobe(CC1101_STX)
-        # Kurze Wartezeit für Synthesizer-Lock
-        time.sleep_us(250)
+        timeout = 100
+        while timeout > 0:
+            state = self._read_status(CC1101_MARSTATE) & 0x1F
+            if state in [19, 20]:  # 19=TX, 20=TX_END
+                break
+            time.sleep_us(10)
+            timeout -= 1
         
         # 5. Pulssignal mit der gewünschten Anzahl an Wiederholungen aussenden
         for _ in range(repetitions):
