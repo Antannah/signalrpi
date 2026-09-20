@@ -111,8 +111,14 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       </div>
 
       <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
-        <h4 style="color:var(--accent);margin-bottom:8px">2. Datei-Upload (Lokal)</h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lade eine geänderte .py Datei direkt vom Rechner in das Pico-Dateisystem hoch.</p>
+        <h4 style="color:var(--accent);margin-bottom:8px">2. Geräte-Konfiguration (Backup)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Sichere alle bekannten Sensoren und Schalter als JSON-Datei auf Deinem Rechner.</p>
+        <a href="/api/devices/download" download="devices.json" class="btn" style="text-decoration:none;display:inline-block">💾 devices.json herunterladen</a>
+      </div>
+
+      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+        <h4 style="color:var(--accent);margin-bottom:8px">3. Datei-Upload (Flash)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lade eine geänderte .py Datei oder ein devices.json Backup direkt auf den Pico hoch.</p>
         <input type="file" id="file-upload-input" style="font-size:0.8rem;margin-bottom:8px;color:var(--text-dim)">
         <button class="btn btn-amber" onclick="uploadFile()">Datei hochladen</button>
         <div id="upload-status" style="font-size:0.8rem;margin-top:8px;color:var(--green)"></div>

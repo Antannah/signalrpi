@@ -61,8 +61,17 @@ if has_config:
     
     # 4. WLAN-Verbindung herstellen
     import network
+    # Hostname für DHCP / Fritzbox setzen (muss vor active/connect passieren)
+    try:
+        network.hostname("SignalRPI")
+    except Exception:
+        pass
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
+    try:
+        wlan.config(hostname="SignalRPI")
+    except Exception:
+        pass
     if not wlan.isconnected():
         print("Verbinde mit WLAN '{}'...".format(config.WIFI_SSID))
         wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)

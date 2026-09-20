@@ -60,6 +60,15 @@ class WebServer:
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
                 writer.write(json.dumps(status).encode("utf-8"))
 
+            elif url == "/api/devices/download":
+                try:
+                    with open("devices.json", "r") as f:
+                        dev_data = f.read()
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Disposition: attachment; filename=\"devices.json\"\r\nConnection: close\r\n\r\n")
+                    writer.write(dev_data.encode("utf-8"))
+                except Exception:
+                    writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n{}")
+
             elif url.startswith("/api/devices/toggle") and method == "POST":
                 body = await reader.read(content_len) if content_len > 0 else b"{}"
                 try:
