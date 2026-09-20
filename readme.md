@@ -115,50 +115,30 @@ Diese Komponente läuft direkt auf dem **RP2040-Microcontroller**. Ihre Hauptauf
 
 ---
 
-### 3.2 Komponente 2: Dekodierung der Signalfolgen (Logik-Ebene)
+### 3.2 Komponente 2: Dekodierung der Signalfolgen (Mustererkennung & Protokoll-Parser)
 
-Diese Komponente nimmt die rohe Puls-Pausen-Folge entgegen und wandelt sie in ein logisches Bit-Muster um, welches anschließend physikalisch interpretiert wird.
+Diese Komponente nimmt die rohe Puls-Pausen-Folge entgegen und wandelt sie in ein logisches Bit-Muster um, welches anschließend physikalisch interpretiert wird. Hierbei kommt die bewährte **SignalDUINO-Mustererkennung (`signalDecoder.cpp`)** zum Einsatz:
 
-#### 1. Protokoll-Matching & Toleranzabgleich
-Die empfangene Signalfolge wird mit einer Datenbank bekannter RF-Protokolle (basierend auf den SignalDUINO-Modulen) abgeglichen. Jedes Protokoll ist durch feste Kenngrößen definiert:
-*   **Sync-Puls-Muster:** Ein langes Startbit gefolgt von einer langen Pause zur Synchronisation (z. B. Sync-Puls von $9000\,\mu\text{s}$ High und $4500\,\mu\text{s}$ Low).
-*   **Bit-Codierung:**
-    *   *Pulsweitenmodulation (PWM):* Logisch 0 = kurzer Puls + lange Pause; Logisch 1 = langer Puls + kurze Pause.
-    *   *Manchester-Codierung / Bi-Phase:* Die Information liegt im Phasenübergang (steigende vs. fallende Flanke in der Mitte des Bit-Intervalls).
-*   **Toleranzband:** Da Bauteiltoleranzen und Signalrauschen die Pulsbreiten verändern, wird beim Vergleich ein Toleranzfenster von typischerweise $\pm 10\%$ bis $\pm 20\%$ auf die Sollzeiten angewendet.
+```mermaid
+flowchart TD
+    Raw["Rohe Pulsfolge (µs)"] --> PD["PatternDecoder (Mustererkennung)"]
+    PD -->|"Basis-Clock T0 (z.B. 380 µs) + diskrete Vielfache [1, 3, 1, 3, 3, 1, ...]"| Decoders{"OOK-Decoder Pipeline"}
+    Decoders -->|"Tri-State / Drehschalter-Code"| IT["Intertechno Decoder (V1 & V3)"]
+    Decoders -->|"PWM 36-Bit Klima"| TCM["CUL_TCM97001 (NC_WS)"]
+    Decoders -->|"PWM 48-Bit Bodenfeuchte"| WS["SD_WS_50"]
+    Decoders -->|"Unbekanntes Muster"| Live["Live-Sniffer / Rohdaten-Export"]
+```
 
-#### 2. Bitstream-Rekonstruktion & Validierung
-*   Wurde ein passendes Protokoll identifiziert, wird die Pulsfolge in ein Array aus Bytes umgewandelt.
-*   **Integritätsprüfung:** Um Fehldekodierungen durch Rauschen zu verhindern, werden protokollspezifische Prüfverfahren angewendet:
-    *   Verifikation der erwarteten Bit-Länge des Protokolls (z. B. exakt 36 Bits für bestimmte Wettersensoren).
-    *   Berechnung und Abgleich von Paritätsbits, Prüfsummen (Checksummen) oder zyklischen Redundanzprüfungen (CRC).
+#### 1. Dynamische Takt- und Vielfachen-Erkennung (`PatternDecoder`)
+*   **Clusterung:** Bildet adaptive Cluster ähnlicher Pulslängen mit $\pm 25\%$ Toleranzband.
+*   **Basis-Takt ($T_0$ / Clock):** Findet die kürzeste signifikant häufige Pulsdauer (typischerweise $10 - 15\%$ aller Pulse, z. B. $380\,\mu\text{s}$).
+*   **Diskrete Vielfache:** Alle Pulse werden als ganzzahlige Vielfache quantisiert: $k_i = \text{round}(P_i / T_0)$. Dadurch sind nachgelagerte Decoder immun gegen Taktjitter und Quarzdriften.
 
-#### 3. Physikalische Datenextraktion und Definition des Sensortyps
-Die Festlegung, um welchen **Sensortyp** (Temperatur, Feuchte, Regen, Wind, Taster etc.) es sich handelt, erfolgt fest codiert auf Ebene der **Protokolldekoder (Komponente 2)**. 
-
-*   **Protokoll-ID als primärer Schlüssel:** Jedes empfangene und erfolgreich validierte Bitmuster wird einem spezifischen Protokoll (z. B. `SD_WS07` oder `TX3`) zugeordnet.
-*   **Bit-Mapping-Tabelle (Parser-Definition):** Im Quellcode des entsprechenden Dekoders ist exakt definiert, welche Bit-Bereiche für welche physikalische Größe stehen.
-    *   *Beispiel-Definition im Dekoder (Python):*
-        ```python
-        # Auszug einer Protokolldefinition
-        PROTOCOL_MAP = {
-            "SD_WS07": {
-                "name": "WeatherStation_WS07",
-                "fields": {
-                    "temperature": {"start_bit": 12, "length": 12, "type": "float", "factor": 0.1, "signed": True, "unit": "°C"},
-                    "humidity":    {"start_bit": 24, "length": 8,  "type": "int",   "factor": 1.0, "signed": False, "unit": "%"},
-                    "battery_low": {"start_bit": 32, "length": 1,  "type": "bool",  "unit": None}
-                }
-            },
-            "SD_WS_Rain": {
-                "name": "RainGauge_WS",
-                "fields": {
-                    "rain_total":  {"start_bit": 16, "length": 16, "type": "float", "factor": 0.3, "signed": False, "unit": "mm"}
-                }
-            }
-        }
-        ```
-*   **Dynamische Typisierung:** Das System weiß durch diesen Abgleich automatisch, ob ein Sensor Temperatur-, Feuchtigkeits-, Regen- oder Winddaten liefert. Es werden nur die Felder extrahiert und im JSON-Objekt bereitgestellt, die laut Protokolldefinition existieren.
+#### 2. Protokoll-Matching & Toleranzabgleich
+Die quantisierten Vielfachen werden der Kette registrierter Decoder übergeben:
+*   *Tri-State Modulation:* $1T / 3T + 1T / 3T \rightarrow$ `'0'`, $1T / 3T + 3T / 1T \rightarrow$ `'F'`, $3T / 1T + 3T / 1T \rightarrow$ `'1'`, $3T / 1T + 1T / 3T \rightarrow$ `'D'`.
+*   *Manchester-Codierung:* Phasenübergänge (z. B. $1T / 1T / 1T / 5T$ vs. $1T / 5T / 1T / 1T$ bei Intertechno V3).
+*   *Pulsweitenmodulation (PWM):* Längenverhältnisse von High- und Low-Phasen (z. B. $1T$ High + $4T/8T$ Low bei TCM97001).
 
 ---
 
@@ -333,18 +313,41 @@ Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen,
 
 ### 7.2 Intertechno (IT - Funkaktoren & Fernbedienungen)
 *   **HF-Parameter:** Frequenz 433.92 MHz, Modulation ASK/OOK.
-*   **Beschreibung:** Steuert Funksteckdosen, Jalousien-Aktoren und empfängt Signale von Wandschaltern.
-*   **Telegramm-Format:** Tri-State oder feste Puls-Pausen-Verhältnisse (12 oder 26 Bits).
-    *   *Puls-Timing:* Typisch $350\,\mu\text{s}$ High / $1050\,\mu\text{s}$ Low (Logisch 0) bzw. $1050\,\mu\text{s}$ High / $350\,\mu\text{s}$ Low (Logisch 1).
-*   **MQTT-Topic:** `signalrpi/messages/IT/<device_id>`
+*   **Beschreibung:** Steuert Funksteckdosen, Einbauschalter und empfängt Signale von Handsendern und Wandschaltern.
+
+#### Intertechno V1 (Klassische Dreh- & DIP-Schalter)
+*   **Telegramm-Format:** 12 Tri-State Bits (24 Flankenpaare + Sync-Pause).
+*   **Tri-State Codierung (Basiszeit $T_0 \approx 380\,\mu\text{s}$):**
+    *   `'0'`: $1T$ High, $3T$ Low, $1T$ High, $3T$ Low
+    *   `'F'`: $1T$ High, $3T$ Low, $3T$ High, $1T$ Low
+    *   `'1'`: $3T$ High, $1T$ Low, $3T$ High, $1T$ Low
+    *   `'D'`: $3T$ High, $1T$ Low, $1T$ High, $3T$ Low
+    *   **Sync-Pause:** $1T$ High, $\approx 31T$ Low (ca. $11{,}5\,\text{ms}$)
+*   **Telegramm-Aufbau (nach FHEM `10_IT.pm` Drehschalter-Standard):**
+    *   *Bits 0..3:* Hauscode / Family (A..P, z. B. `0F00` = `C`)
+    *   *Bits 4..7:* Geräteadresse (1..16, z. B. `0F00` = `3`)
+    *   *Bits 8..9:* Gruppe (`0F`)
+    *   *Bits 10..11:* Zustand (`FF` = ON, `F0` = OFF)
+*   **MQTT-Topic:** `signalrpi/messages/IT/<family>_<group>_<device>` (z. B. `IT/C_1_3`)
 *   **JSON-Payload:**
     ```json
     {
-      "state": "on",     // oder "off"
-      "group": "0",
-      "channel": "0001"
+      "family": "C",
+      "group": 1,
+      "device": 3,
+      "state": "ON",
+      "raw_tristate": "0F000F000FFF",
+      "clock": 380
     }
     ```
+
+#### Intertechno V3 (Selbstlernend / Manchester)
+*   **Telegramm-Format:** 32-Bit Manchester (Preamble $1T$ High + $10T$ Low, 32 Bits, Stop-Pause $1T$ High + $36T$ Low).
+*   **Codierung ($T_0 \approx 275\,\mu\text{s}$):**
+    *   Bit 0: $1T$ High, $1T$ Low, $1T$ High, $5T$ Low
+    *   Bit 1: $1T$ High, $5T$ Low, $1T$ High, $1T$ Low
+*   **Aufbau:** 26 Bit Rolling-Code + 1 Bit Gruppe + 1 Bit State + 4 Bit Unit/Kanal.
+*   **MQTT-Topic:** `signalrpi/messages/IT_V3/<binary_code>`
 
 ### 7.3 SD_WS (SignalDUINO Wettersensoren)
 Dieser Decoder fasst verschiedene Wettersensoren (Bodenfeuchte und Regen) zusammen, die über das SignalDUINO-Framework empfangen werden.
