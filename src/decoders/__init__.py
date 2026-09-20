@@ -3,9 +3,12 @@
 from .cul_tcm97001 import DecoderTCM97001
 from .sd_ws_ook import DecoderWSOOK
 from .sd_ws_fsk import DecoderWSFSK
+from .intertechno import DecoderIntertechno
+from pattern_decoder import PatternDecoder
 
-# OOK-Decoder (Puls-Pausen-Folgen)
+# OOK-Decoder (Puls-Pausen-Folgen & SignalPatterns)
 DECODERS_OOK = [
+    DecoderIntertechno(),
     DecoderTCM97001(),
     DecoderWSOOK(),
 ]
@@ -18,14 +21,28 @@ DECODERS_FSK = [
 def decode_ook_signal(pulse_width_sequence: list) -> dict | None:
     """
     Versucht, eine Puls-Pausen-Folge mit allen registrierten OOK-Decodern zu interpretieren.
+    Extrahiert vorab das SignalPattern (Basis-Takt und Vielfache) nach SignalDUINO-Art.
     """
+    # 1. Voranalyse: Muster und Takt bestimmen
+    pattern = None
+    try:
+        pattern = PatternDecoder.decode_pattern(pulse_width_sequence)
+    except Exception as e:
+        print("Musterdecoder Fehler:", e)
+
+    # 2. Pipeline der Protokoll-Decoder durchlaufen
     for decoder in DECODERS_OOK:
         try:
-            result = decoder.decode(pulse_width_sequence)
+            # Decoder bevorzugt mit voranalysiertem Pattern aufrufen, Fallback auf Rohfolge
+            result = None
+            if pattern:
+                result = decoder.decode(pattern)
+            if not result:
+                result = decoder.decode(pulse_width_sequence)
+                
             if result:
                 return result
         except Exception as e:
-            # Tolerantes Fehlverhalten bei Parser-Fehlern
             print("Fehler im OOK-Decoder {}: {}".format(decoder.name, e))
     return None
 

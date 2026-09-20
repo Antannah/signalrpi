@@ -97,8 +97,8 @@ class PIOReceiver:
             
             if self.expect_high:
                 # High-Phase: Direktwert
-                # Glitch-Filter: Ignoriere extrem kurze Störimpulse (z.B. < 30 µs) zu Beginn eines Pakets
-                if val < 30 and len(self.pulse_buffer) == 0:
+                # Glitch-Filter: Ignoriere extrem kurze Störimpulse (< 30 µs) oder Überläufe (>= 0x7FFFFFFF) zu Beginn
+                if (val < 30 or val >= 0x7FFFFFFF or val > 100000) and len(self.pulse_buffer) == 0:
                     self.expect_high = True  # Erwarte weiterhin den ersten echten High-Puls
                     continue
                 
