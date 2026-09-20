@@ -4,11 +4,19 @@
 import machine
 import time
 import json
+import gc
 from machine import Pin, SPI
 from cc1101 import CC1101
 from pio_receiver import PIOReceiver
 from umqtt.simple import MQTTClient
 import decoders
+
+# Onboard-LED für Aktivitätsanzeige (Pico W nutzt Pin 'LED' über den CYW43)
+try:
+    led = Pin("LED", Pin.OUT)
+    led.value(0)
+except Exception:
+    led = None
 
 # Versuche, die lokale Konfiguration zu laden
 try:
@@ -153,6 +161,8 @@ if has_config:
             # 433 MHz Paketprüfung
             packet_433 = rx_433.get_packet()
             if packet_433:
+                if led:
+                    led.value(1)
                 rssi = cc_433.get_rssi()
                 decoded = decoders.decode_signal(packet_433)
                 
@@ -200,6 +210,8 @@ if has_config:
             if mode_868 == "FSK":
                 packet_868 = cc_868.read_fsk_packet()
                 if packet_868:
+                    if led:
+                        led.value(1)
                     payload = packet_868[:14]
                     rssi_val = packet_868[14]
                     rssi = (rssi_val - 256) / 2.0 - 74.0 if rssi_val >= 128 else (rssi_val / 2.0) - 74.0
@@ -236,6 +248,8 @@ if has_config:
             else:
                 packet_868 = rx_868.get_packet()
                 if packet_868:
+                    if led:
+                        led.value(1)
                     rssi = cc_868.get_rssi()
                     decoded = decoders.decode_signal(packet_868)
                     proto_name = decoded["protocol"] if decoded else "RAW_868_OOK"
@@ -248,6 +262,8 @@ if has_config:
                         
             # Kleiner Yield für Kooperatives Multitasking & periodische GC gegen Fragmentierung
             await asyncio.sleep_ms(1)
+            if led and led.value():
+                led.value(0)
             if gc_counter % 200 == 0:
                 gc.collect()
             gc_counter += 1
