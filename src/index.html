@@ -214,8 +214,11 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
     <h3 id="cfg-modal-title" style="margin-bottom:8px">⚙ Sensor anlernen & konfigurieren</h3>
     <div id="cfg-modal-info" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;font-size:0.85rem;margin-bottom:12px"></div>
     
-    <label style="font-size:0.8rem;color:var(--text-dim)">Gerätename:</label>
-    <input id="cfg-name" class="form-input" type="text" placeholder="z.B. Wohnzimmer Thermometer">
+    <label style="font-size:0.8rem;color:var(--text-dim)">Gerätename (Anzeige in HA & Web):</label>
+    <input id="cfg-name" class="form-input" type="text" placeholder="z.B. Wohnzimmer Thermometer" oninput="onCfgNameInput()">
+    
+    <label style="font-size:0.8rem;color:var(--text-dim)">Home Assistant ID (eindeutige Geräte-ID):</label>
+    <input id="cfg-ha-id" class="form-input" type="text" placeholder="z.B. wohnzimmer_thermometer" style="margin-bottom:10px">
     
     <label style="font-size:0.8rem;color:var(--text-dim)">Gerätetyp / Funktion:</label>
     <select id="cfg-type-select" class="form-input" style="margin-bottom:12px" onchange="onCfgTypeChange()">
@@ -446,6 +449,17 @@ function resetITV1Form(){
   document.getElementById('it-v1-cancel-btn').style.display = 'none';
 }
 
+function onCfgNameInput(){
+  let editId = document.getElementById('cfg-edit-id').value.trim();
+  // Wenn es ein Neuanlernen ist, automatisch die HA-ID vorschlagen
+  if(!editId){
+    let n = document.getElementById('cfg-name').value.trim();
+    document.getElementById('cfg-ha-id').value = n.toLowerCase()
+      .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9]/g, '_');
+  }
+}
+
 function openEditSensorModal(dev){
   pendingAdoptPacket = {
     proto: dev.protocol,
@@ -455,6 +469,7 @@ function openEditSensorModal(dev){
     editDev: dev
   };
   document.getElementById('cfg-edit-id').value = dev.id;
+  document.getElementById('cfg-ha-id').value = dev.id;
   document.getElementById('cfg-modal-title').innerText = '⚙ Sensor bearbeiten';
   document.getElementById('cfg-modal-info').innerHTML = `
     <b>Protokoll:</b> ${dev.protocol} | <b>Funk-ID:</b> <code>${dev.device_id}</code> ${dev.channel ? '| <b>Kanal:</b> '+dev.channel : ''}
@@ -689,6 +704,7 @@ function openAdoptModal(pkt){
   `;
   document.getElementById('cfg-name').value = pkt.proto + ' ' + pkt.id;
   document.getElementById('cfg-edit-id').value = '';
+  onCfgNameInput();
 
   // Typ-Vorbelegung: Wenn IT -> standardmäßig Schalter oder Taster
   let typeSel = document.getElementById('cfg-type-select');
@@ -757,12 +773,20 @@ async function saveConfiguredDevice(){
   let editId = document.getElementById('cfg-edit-id').value.trim();
   let existingDev = editId ? (knownDevices || []).find(d => d.id === editId) : null;
 
-  let safeId = editId || name.toLowerCase()
+  let customHaId = document.getElementById('cfg-ha-id').value.trim();
+  let safeId = customHaId || editId || name.toLowerCase()
     .replace(/ä/g, 'ae')
     .replace(/ö/g, 'oe')
     .replace(/ü/g, 'ue')
     .replace(/ß/g, 'ss')
     .replace(/[^a-z0-9]/g, '_');
+
+  // Falls sich die ID geändert hat (Umbenennung), altes Gerät und alte HA-Topics sauber entfernen
+  if(editId && editId !== safeId){
+    try {
+      await fetch('/api/devices?id=' + encodeURIComponent(editId), {method: 'DELETE'});
+    } catch(e){}
+  }
   
   let isEnabled = existingDev ? (existingDev.enabled !== false) : false;
   let selectedType = document.getElementById('cfg-type-select').value;

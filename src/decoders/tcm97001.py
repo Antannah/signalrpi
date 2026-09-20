@@ -22,17 +22,20 @@ class DecoderTCM97001(BaseDecoder):
             raw_pulses = signal.raw_pulses
         elif isinstance(signal, list):
             raw_pulses = signal
+            # 1. Schnelle direkte Zeitschwellen-Logik (original cul_tcm97001, null Overhead/RAM)
+            res = self._decode_raw(raw_pulses)
+            if res:
+                return res
             pattern = PatternDecoder.decode_pattern(signal)
 
-        # 1. Bevorzugt über Mustererkennung (SignalPattern)
-        if pattern and 350 <= pattern.clock <= 650:
-            res = self._decode_pattern(pattern)
+        # 2. Falls SignalPattern vorliegt oder Rohanalyse fehlschlug
+        if raw_pulses:
+            res = self._decode_raw(raw_pulses)
             if res:
                 return res
 
-        # 2. Direkter Fallback auf rohe Mikrosekunden (originale cul_tcm97001 Logik)
-        if raw_pulses:
-            return self._decode_raw(raw_pulses)
+        if pattern and 350 <= pattern.clock <= 650:
+            return self._decode_pattern(pattern)
 
         return None
 
