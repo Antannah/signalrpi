@@ -176,6 +176,14 @@ class WebServer:
                             f.write(chunk)
                             remaining -= len(chunk)
                     writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                    # Falls devices.json hochgeladen wurde, DeviceManager sofort neu einlesen & MQTT Discovery synchronisieren
+                    if filename == "devices.json":
+                        try:
+                            self.device_manager.load()
+                            if self.device_manager.mqtt_client:
+                                self.device_manager.publish_all_discovery()
+                        except Exception as e:
+                            print("Fehler beim Neuladen der Geräte nach Upload:", e)
                 except Exception as ex:
                     print("Upload Fehler:", ex)
                     writer.write(b"HTTP/1.1 500 Server Error\r\nConnection: close\r\n\r\n")

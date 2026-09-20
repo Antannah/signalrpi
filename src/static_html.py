@@ -111,16 +111,24 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       </div>
 
       <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
-        <h4 style="color:var(--accent);margin-bottom:8px">2. Geräte-Konfiguration (Backup)</h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Sichere alle bekannten Sensoren und Schalter als JSON-Datei auf Deinem Rechner.</p>
-        <a href="/api/devices/download" download="devices.json" class="btn" style="text-decoration:none;display:inline-block">💾 devices.json herunterladen</a>
+        <h4 style="color:var(--accent);margin-bottom:8px">2. Geräte-Konfiguration (Backup & Restore)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px">Sichere alle bekannten Geräte oder lade ein Backup wieder zurück in den Pico.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+          <a href="/api/devices/download" download="devices.json" class="btn" style="text-decoration:none;display:inline-block">💾 Download</a>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">
+          <label style="font-size:0.75rem;color:var(--text-dim)">devices.json wiederherstellen:</label>
+          <input type="file" id="devices-upload-input" accept=".json" style="font-size:0.8rem;margin:6px 0;color:var(--text-dim);display:block">
+          <button class="btn btn-amber" onclick="uploadDevicesJson()">Wiederherstellen</button>
+          <div id="devices-upload-status" style="font-size:0.8rem;margin-top:6px;color:var(--green)"></div>
+        </div>
       </div>
 
       <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
-        <h4 style="color:var(--accent);margin-bottom:8px">3. Datei-Upload (Flash)</h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lade eine geänderte .py Datei oder ein devices.json Backup direkt auf den Pico hoch.</p>
+        <h4 style="color:var(--accent);margin-bottom:8px">3. Entwickler Datei-Upload (Flash)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lade eine beliebige .py Datei direkt vom Rechner in den Pico-Flashspeicher hoch.</p>
         <input type="file" id="file-upload-input" style="font-size:0.8rem;margin-bottom:8px;color:var(--text-dim)">
-        <button class="btn btn-amber" onclick="uploadFile()">Datei hochladen</button>
+        <button class="btn" style="background:#64748b;color:#fff" onclick="uploadFile()">Datei hochladen</button>
         <div id="upload-status" style="font-size:0.8rem;margin-top:8px;color:var(--green)"></div>
       </div>
     </div>
@@ -555,6 +563,48 @@ async function uploadFile(){
       }
     };
     reader.readAsArrayBuffer(file);
+  }catch(e){
+    st.innerText = 'Upload fehlgeschlagen: ' + e;
+  }
+}
+
+async function uploadDevicesJson(){
+  let input = document.getElementById('devices-upload-input');
+  let st = document.getElementById('devices-upload-status');
+  if(!input.files || !input.files[0]){
+    alert('Bitte zuerst eine devices.json Datei auswählen!');
+    return;
+  }
+  let file = input.files[0];
+  if(!file.name.endsWith('.json')){
+    alert('Bitte eine gültige .json Datei auswählen!');
+    return;
+  }
+  st.innerText = 'Lade Geräte-Konfiguration hoch...';
+  try{
+    let reader = new FileReader();
+    reader.onload = async function(e){
+      let text = e.target.result;
+      try{
+        JSON.parse(text); // Validierungsprüfung
+      }catch(err){
+        alert('Ungültiges JSON-Format! Abbruch.');
+        st.innerText = 'Fehler: Ungültiges JSON';
+        return;
+      }
+      let res = await fetch('/api/upload?filename=devices.json', {
+        method: 'POST',
+        body: text
+      });
+      if(res.ok){
+        st.innerText = 'Geräte erfolgreich wiederhergestellt & geladen!';
+        refreshDevices();
+        alert('Geräte-Konfiguration erfolgreich wiederhergestellt!');
+      } else {
+        st.innerText = 'Fehler beim Wiederherstellen.';
+      }
+    };
+    reader.readAsText(file);
   }catch(e){
     st.innerText = 'Upload fehlgeschlagen: ' + e;
   }
