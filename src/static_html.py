@@ -447,7 +447,12 @@ async function saveConfiguredDevice(){
   let name = document.getElementById('cfg-name').value.trim();
   if(!name) { alert('Bitte einen Namen angeben'); return; }
   
-  let safeId = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  let safeId = name.toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]/g, '_');
   let isEnabled = document.getElementById('cfg-enabled').checked;
   
   let entities = [];
