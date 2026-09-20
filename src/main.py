@@ -299,7 +299,14 @@ if has_config:
                             # 2. Falls einem konfigurierten HA-Device zugeordnet & freigegeben -> HA State Topic
                             if matched_ha_id and is_enabled:
                                 ha_topic = "signalrpi/devices/{}/state".format(matched_ha_id)
-                                client.publish(ha_topic, json.dumps(decoded["data"]))
+                                dev_obj = device_mgr.get_device(matched_ha_id)
+                                if dev_obj and dev_obj.get("type") == "switch":
+                                    # Home Assistant Switches erwarten "ON" oder "OFF" als Rohstring
+                                    state_str = str(decoded["data"].get("state", "OFF")).upper()
+                                    client.publish(ha_topic, state_str, retain=True)
+                                else:
+                                    # Sensoren erhalten vollständiges JSON mit allen Entitäten
+                                    client.publish(ha_topic, json.dumps(decoded["data"]))
                         else:
                             client.publish("signalrpi/raw/433", json.dumps({
                                 "rssi": rssi,
