@@ -124,7 +124,7 @@ flowchart TD
     Raw["Rohe Pulsfolge (µs)"] --> PD["PatternDecoder (Mustererkennung)"]
     PD -->|"Basis-Clock T0 (z.B. 380 µs) + diskrete Vielfache [1, 3, 1, 3, 3, 1, ...]"| Decoders{"OOK-Decoder Pipeline"}
     Decoders -->|"Tri-State / Drehschalter-Code"| IT["Intertechno Decoder (V1 & V3)"]
-    Decoders -->|"PWM 36-Bit Klima"| TCM["CUL_TCM97001 (NC_WS)"]
+    Decoders -->|"PWM 36-Bit Klima"| TCM["TCM97001 (NC_WS)"]
     Decoders -->|"PWM 48-Bit Bodenfeuchte"| WS["SD_WS_50"]
     Decoders -->|"Unbekanntes Muster"| Live["Live-Sniffer / Rohdaten-Export"]
 ```
@@ -287,19 +287,19 @@ MODE_868 = "FSK"
 
 Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen, wurden die folgenden Decoder implementiert und integriert.
 
-### 7.1 CUL_TCM97001 (TFA / NC_WS Klimasensoren)
+### 7.1 TCM97001 (TFA / NC_WS Klimasensoren)
 *   **HF-Parameter:** Frequenz 433.92 MHz, Modulation ASK/OOK.
 *   **Beschreibung:** Dieser Decoder übersetzt Signale von Temperatur- und Luftfeuchtigkeitssensoren (z. B. TFA Thermo-Hygrometer oder PEARL NC7159).
-*   **Telegramm-Format:** 36-Bit PWM (Pulse-Width Modulation).
+*   **Telegramm-Format:** 36-Bit PWM (Pulse-Width Modulation via `PatternDecoder`).
     *   *Puls-Timing:*
         *   **Sync:** ca. $500\,\mu\text{s}$ High + $9000\,\mu\text{s}$ Low.
-        *   **Logisch 0:** ca. $500\,\mu\text{s}$ High + $2000\,\mu\text{s}$ Low.
-        *   **Logisch 1:** ca. $500\,\mu\text{s}$ High + $4000\,\mu\text{s}$ Low.
+        *   **Logisch 0:** ca. $500\,\mu\text{s}$ High + $2000\,\mu\text{s}$ Low ($1T$ High + $4T$ Low).
+        *   **Logisch 1:** ca. $500\,\mu\text{s}$ High + $4000\,\mu\text{s}$ Low ($1T$ High + $8T$ Low).
     *   *Dekodierungslogik:* 
         *   Extrahiert die 12-Bit-Temperatur (Bits 16-27), wobei negative Werte im Zweierkomplement berechnet werden.
         *   Extrahiert die 7-Bit-Luftfeuchtigkeit (Bits 29-35), den Kanal (Bits 14-15), den Batteriestatus (Low = `0`, OK = `1`) und den Sendemodus.
         *   Die Geräte-ID in FHEM entspricht dem dezimalen Wert des ersten Bytes (z. B. `0x50` -> ID `80`).
-*   **MQTT-Topic:** `signalrpi/messages/CUL_TCM97001/<device_id>`
+*   **MQTT-Topic:** `signalrpi/messages/TCM97001/<device_id>`
 *   **JSON-Payload:**
     ```json
     {

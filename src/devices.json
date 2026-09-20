@@ -2,7 +2,7 @@
   {
     "id": "balkon_wetter",
     "name": "Balkon Wetter",
-    "protocol": "CUL_TCM97001",
+    "protocol": "TCM97001",
     "channel": 1,
     "type": "sensor",
     "entities": [

@@ -15,10 +15,15 @@ FILES_TO_UPDATE = [
     "src/cc1101.py",
     "src/pio_receiver.py",
     "src/time_sync.py",
+    "src/pattern_decoder.py",
+    "src/it_encoder.py",
     "src/ota_updater.py",
     "src/decoders/__init__.py",
-    "src/decoders/cul_tcm97001.py",
-    "src/decoders/lacrosse.py"
+    "src/decoders/base.py",
+    "src/decoders/intertechno.py",
+    "src/decoders/tcm97001.py",
+    "src/decoders/sd_ws_ook.py",
+    "src/decoders/sd_ws_fsk.py"
 ]
 
 def update_from_github(callback=None):
