@@ -46,44 +46,62 @@ class DecoderTCM97001(BaseDecoder):
         """
         m = pattern.multiples
         bits = []
-        for i in range(0, len(m) - 1, 2):
+        i = 0
+        while i < len(m) - 1:
             high = m[i]
             low = m[i+1]
             if high == 1:
                 if 3 <= low <= 5:
                     bits.append(0)
+                    i += 2
+                    continue
                 elif 6 <= low <= 10:
                     bits.append(1)
-                elif low >= 14:
-                    # Sync-Puls überspringen
-                    pass
+                    i += 2
+                    continue
+            
+            # Bei Fehlpassung oder Sync: Puffer zurücksetzen wenn noch keine 36 Bits
+            if len(bits) < 36:
+                bits = []
+            elif len(bits) >= 36:
+                break
+            i += 1
 
-        if len(bits) != 36:
+        if len(bits) < 36:
             return None
 
-        return self._parse_bits(bits, pattern.clock)
+        return self._parse_bits(bits[:36], pattern.clock)
 
     def _decode_raw(self, pulses: list) -> dict | None:
         """
-        Originale CUL_TCM97001 Zeitschwellen-Logik.
+        Originale CUL_TCM97001 Zeitschwellen-Logik mit Schiebefenster.
         """
         bits = []
-        for i in range(0, len(pulses) - 1, 2):
+        i = 0
+        while i < len(pulses) - 1:
             high = pulses[i]
             low = pulses[i+1]
 
             if 250 <= high <= 850:
-                if 1500 <= low <= 2800:
+                if 1400 <= low <= 2800:
                     bits.append(0)
+                    i += 2
+                    continue
                 elif 3000 <= low <= 5200:
                     bits.append(1)
-                elif 7000 <= low <= 11000:
-                    pass
+                    i += 2
+                    continue
 
-        if len(bits) != 36:
+            if len(bits) < 36:
+                bits = []
+            elif len(bits) >= 36:
+                break
+            i += 1
+
+        if len(bits) < 36:
             return None
 
-        return self._parse_bits(bits)
+        return self._parse_bits(bits[:36])
 
     def _parse_bits(self, bits: list[int], clock: int | None = None) -> dict | None:
         """

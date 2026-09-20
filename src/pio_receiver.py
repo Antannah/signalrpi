@@ -57,7 +57,7 @@ def pulse_timer():
 
 
 class PIOReceiver:
-    def __init__(self, sm_id: int, pin_num: int, pause_threshold_us: int = 5000, min_pulses: int = 8):
+    def __init__(self, sm_id: int, pin_num: int, pause_threshold_us: int = 10000, min_pulses: int = 8):
         """
         Initialisiert den PIO-Empfänger für Pulse-Pause-Modulationen.
         

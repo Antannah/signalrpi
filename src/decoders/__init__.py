@@ -11,8 +11,6 @@ from pattern_decoder import PatternDecoder
 DECODERS_OOK = [
     DecoderIntertechno(),
     DecoderTCM97001(),
-    DecoderWS07(),
-    DecoderWSOOK(),
 ]
 
 # FSK-Decoder (Byte-Pakete)

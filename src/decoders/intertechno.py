@@ -58,8 +58,8 @@ class DecoderIntertechno(BaseDecoder):
         if not (240 <= pattern.clock <= 440):
             return None
 
-        # Ein echtes IT V1 Telegramm hat zwingend einen Sync-/Pausen-Puls von ca. 31T (>= 20T)
-        if pattern.sync_ratio < 20.0:
+        # Ein echtes IT V1 Telegramm hat einen Sync-/Pausen-Puls (mind. 12T, typ. 31T)
+        if pattern.sync_ratio < 12.0:
             return None
 
         m = pattern.multiples
