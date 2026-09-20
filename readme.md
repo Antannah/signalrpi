@@ -379,4 +379,15 @@ Dieser Decoder fasst verschiedene Wettersensoren (Bodenfeuchte und Regen) zusamm
 *   **MQTT-Topic:** `signalrpi/messages/SD_WS_126/<device_id>` (z. B. `011CDF`)
 *   **JSON-Payload:** `{"rain_total": 12.3, "rain_ticks": 123, "battery_voltage": 1.5, "battery_low": false}`
 
+---
+
+## 8. Lizenz & Danksagungen (Acknowledgements)
+
+Dieses Projekt ist unter der **GNU General Public License v3.0 (GPLv3)** lizenziert. Siehe [LICENSE](LICENSE) für den vollständigen Lizenztext.
+
+### Danksagung
+Ein herzlicher Dank geht an die Open-Source-Community rund um das FHEM- und RF-Ökosystem, insbesondere an das Team von **[RFD-FHEM](https://github.com/RFD-FHEM)**:
+*   **[SignalDUINO](https://github.com/RFD-FHEM/RFFHEM)** / **[RFFHEM](https://github.com/RFD-FHEM/RFFHEM)**: Für die Pionierarbeit bei der Erfassung, Dokumentation und Dekodierung zahlloser 433- und 868-MHz-Funkprotokolle.
+*   **[PySignalduino](https://github.com/RFD-FHEM/PySignalduino)**: Für die Inspiration und Referenzmodelle zur Repräsentation von Signalfolgen in Python.
+
 
