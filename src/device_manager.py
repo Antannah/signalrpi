@@ -29,6 +29,12 @@ class DeviceManager:
     def get_all(self):
         return self.devices
 
+    def get_device(self, ha_id):
+        for dev in self.devices:
+            if dev.get("id") == ha_id:
+                return dev
+        return None
+
     def add_or_update(self, dev):
         # Prüfung, ob ID bereits existiert
         dev_id = dev.get("id")
@@ -106,6 +112,23 @@ class DeviceManager:
                         self.remove_discovery(ha_id)
                 return True, dev["enabled"]
         return False, False
+
+    def set_repetitions(self, ha_id, repetitions: int):
+        for dev in self.devices:
+            if dev.get("id") == ha_id:
+                dev["repetitions"] = max(1, min(25, int(repetitions)))
+                self.save()
+                if self.mqtt_client:
+                    try:
+                        self.mqtt_client.publish(
+                            "signalrpi/devices/{}/repetitions/state".format(ha_id),
+                            str(dev["repetitions"]),
+                            retain=True
+                        )
+                    except Exception:
+                        pass
+                return True
+        return False
 
     def reassign_sensor(self, ha_id, new_dev_id, new_channel=None):
         """
@@ -189,6 +212,7 @@ class DeviceManager:
                         pass
                     
         elif dev_type == "switch":
+            # 1. Switch Entity
             disc_topic = "homeassistant/switch/signalrpi_{}/config".format(dev_id)
             payload = {
                 "name": dev_name,
@@ -203,12 +227,29 @@ class DeviceManager:
                 self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
                 time.sleep_ms(25)
             except Exception as e:
-                print("HA Discovery Fehler:", e)
-                try:
-                    self.mqtt_client.connect()
-                    self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
-                except Exception:
-                    pass
+                print("HA Discovery Fehler (Switch):", e)
+
+            # 2. Number Entity für Repetitions (Wiederholungen)
+            rep_topic = "homeassistant/number/signalrpi_{}_rep/config".format(dev_id)
+            rep_payload = {
+                "name": "{} Wiederholungen".format(dev_name),
+                "command_topic": "signalrpi/devices/{}/repetitions/set".format(dev_id),
+                "state_topic": "signalrpi/devices/{}/repetitions/state".format(dev_id),
+                "unique_id": "signalrpi_{}_repetitions".format(dev_id),
+                "min": 1,
+                "max": 25,
+                "step": 1,
+                "icon": "mdi:repeat",
+                "device": device_info
+            }
+            try:
+                self.mqtt_client.publish(rep_topic, json.dumps(rep_payload), retain=True)
+                time.sleep_ms(25)
+                # Aktuellen Repetitions-Wert publishen
+                curr_rep = dev.get("repetitions", 6)
+                self.mqtt_client.publish("signalrpi/devices/{}/repetitions/state".format(dev_id), str(curr_rep), retain=True)
+            except Exception as e:
+                print("HA Discovery Fehler (Repetitions):", e)
 
     def remove_discovery(self, dev_id):
         if not self.mqtt_client:
@@ -232,8 +273,11 @@ class DeviceManager:
                     pass
         else:
             disc_topic = "homeassistant/switch/signalrpi_{}/config".format(dev_id)
+            rep_topic = "homeassistant/number/signalrpi_{}_rep/config".format(dev_id)
             try:
                 self.mqtt_client.publish(disc_topic, "", retain=True)
+                time.sleep_ms(20)
+                self.mqtt_client.publish(rep_topic, "", retain=True)
             except Exception:
                 pass
 

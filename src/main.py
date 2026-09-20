@@ -109,27 +109,112 @@ if has_config:
             client.set_last_will("signalrpi/status", '{"state": "offline"}', retain=True, qos=1)
             client.connect()
             client.publish("signalrpi/status", '{"state": "online"}', retain=True, qos=1)
-            
-            # Callback für Fernsteuerungs-Kommandos (OTA Update)
-            def mqtt_callback(topic, msg):
-                t_str = topic.decode("utf-8") if isinstance(topic, bytes) else str(topic)
-                if t_str == "signalrpi/system/ota_update":
-                    print("MQTT OTA Update Befehl empfangen!")
-                    import ota_updater
-                    ota_updater.update_from_github()
-            
-            client.set_callback(mqtt_callback)
-            client.subscribe("signalrpi/system/ota_update")
             print("MQTT erfolgreich verbunden!")
         except Exception as e:
             print("MQTT-Verbindungsfehler:", e)
     else:
         print("MQTT übersprungen (kein WLAN).")
-        
+
     # 6. Device Manager & Home Assistant Auto-Discovery
     from device_manager import DeviceManager
     device_mgr = DeviceManager(mqtt_client=client)
+
+    # 7. Sende-Handler für 433 MHz (Intertechno V1 & V3)
+    from it_encoder import ITEncoder
+
+    def handle_tx(cmd_data: dict) -> bool:
+        """
+        Führt einen Sende-Befehl über das 433 MHz CC1101-Modul aus.
+        Unterstützt Intertechno V1 und V3 mit konfigurierbaren Wiederholungen (repetitions).
+        """
+        try:
+            proto = cmd_data.get("protocol", "IT_V3").upper()
+            action = cmd_data.get("action", "on").lower()
+            state = (action in ["on", "learn", "true", "1"])
+            reps = int(cmd_data.get("repetitions", 6))
+            
+            pulses = None
+            if proto == "IT_V3":
+                bin_code = cmd_data.get("binary_code", "00011100110111100110100111")
+                channel = int(cmd_data.get("channel", 1))
+                pulses = ITEncoder.encode_it_v3(bin_code, channel, state, group=False)
+            elif proto in ["IT", "IT_V1"]:
+                fam = cmd_data.get("family", "A")
+                group = int(cmd_data.get("group", 1))
+                dev = int(cmd_data.get("device", 1))
+                pulses = ITEncoder.encode_it_v1(fam, group, dev, state)
+                
+            if pulses:
+                # Vorübergehend State Machine von RX pausieren während TX
+                rx_433.sm.active(0)
+                try:
+                    cc_433.transmit_ook_pulses(cc_433.gdo0_pin, pulses, repetitions=reps)
+                finally:
+                    rx_433.sm.active(1)
+                    rx_433.sm.put(rx_433.pause_threshold)
+                print("TX 433 MHz:", proto, action.upper(), "Reps:", reps)
+                return True
+        except Exception as ex:
+            print("Fehler beim 433 MHz Senden:", ex)
+        return False
+
+    # MQTT Callback für Fernsteuerung (OTA, Schalter und Repetitions)
     if client:
+        def mqtt_callback(topic, msg):
+            try:
+                t_str = topic.decode("utf-8") if isinstance(topic, bytes) else str(topic)
+                m_str = msg.decode("utf-8").strip() if isinstance(msg, bytes) else str(msg).strip()
+                
+                if t_str == "signalrpi/system/ota_update":
+                    print("MQTT OTA Update Befehl empfangen!")
+                    import ota_updater
+                    ota_updater.update_from_github()
+                    
+                elif t_str.startswith("signalrpi/devices/") and t_str.endswith("/set"):
+                    # Format: signalrpi/devices/<ha_id>/set
+                    parts = t_str.split("/")
+                    ha_id = parts[2]
+                    dev = device_mgr.get_device(ha_id)
+                    if dev and dev.get("type") == "switch":
+                        reps = dev.get("repetitions", 6)
+                        proto = dev.get("protocol", "IT_V3")
+                        state_val = m_str.upper()
+                        tx_cmd = {
+                            "protocol": proto,
+                            "action": "on" if state_val in ["ON", "TRUE", "1"] else "off",
+                            "repetitions": reps
+                        }
+                        if proto == "IT_V3":
+                            tx_cmd["binary_code"] = dev.get("binary_code")
+                            tx_cmd["channel"] = dev.get("channel", 1)
+                        elif proto == "IT":
+                            it_c = dev.get("it_code", {})
+                            tx_cmd["family"] = it_c.get("family", "A")
+                            tx_cmd["group"] = it_c.get("group", 1)
+                            tx_cmd["device"] = it_c.get("device", 1)
+                            
+                        if handle_tx(tx_cmd):
+                            # Schalter-Status an Home Assistant zurückmelden
+                            client.publish("signalrpi/devices/{}/state".format(ha_id), state_val, retain=True)
+                            device_mgr.set_latest(ha_id, {"state": state_val})
+                            
+                elif t_str.startswith("signalrpi/devices/") and t_str.endswith("/repetitions/set"):
+                    # Format: signalrpi/devices/<ha_id>/repetitions/set
+                    parts = t_str.split("/")
+                    ha_id = parts[2]
+                    try:
+                        new_rep = int(m_str)
+                        device_mgr.set_repetitions(ha_id, new_rep)
+                        print("MQTT Repetitions für", ha_id, "auf", new_rep, "gesetzt")
+                    except Exception as e:
+                        print("Fehler beim Setzen der Repetitions:", e)
+            except Exception as ex:
+                print("MQTT Callback Fehler:", ex)
+
+        client.set_callback(mqtt_callback)
+        client.subscribe("signalrpi/system/ota_update")
+        client.subscribe("signalrpi/devices/+/set")
+        client.subscribe("signalrpi/devices/+/repetitions/set")
         print("Sende Home Assistant Auto-Discovery für bekannte Geräte...")
         device_mgr.publish_all_discovery()
 
@@ -153,12 +238,12 @@ if has_config:
             "raw": raw_data
         })
 
-    # 7. Asynchroner Webserver starten
+    # 8. Asynchroner Webserver starten
     import gc
     gc.collect()
     import uasyncio as asyncio
     from web_server import WebServer
-    web_srv = WebServer(device_manager=device_mgr, sniffer_queue=sniffer_queue, wlan=wlan, port=80)
+    web_srv = WebServer(device_manager=device_mgr, sniffer_queue=sniffer_queue, wlan=wlan, port=80, tx_handler=handle_tx)
 
     print("\nsignalrpi ist betriebsbereit!")
     if wlan.isconnected():

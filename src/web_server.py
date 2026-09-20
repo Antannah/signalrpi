@@ -2,14 +2,14 @@
 import uasyncio as asyncio
 import json
 import gc
-from static_html import HTML_PAGE
 
 class WebServer:
-    def __init__(self, device_manager, sniffer_queue, wlan, port=80):
+    def __init__(self, device_manager, sniffer_queue, wlan, port=80, tx_handler=None):
         self.device_manager = device_manager
         self.sniffer_queue = sniffer_queue
         self.wlan = wlan
         self.port = port
+        self.tx_handler = tx_handler
 
     async def start(self):
         server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
@@ -44,9 +44,22 @@ class WebServer:
 
             # Routing
             if url == "/" or url.startswith("/index"):
-                # HTML Dashboard streamen
+                # HTML Dashboard chunked streamen aus Datei (extrem RAM-schonend)
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n")
-                writer.write(HTML_PAGE.encode("utf-8"))
+                await writer.drain()
+                try:
+                    with open("index.html", "r") as f:
+                        while True:
+                            chunk = f.read(1024)
+                            if not chunk:
+                                break
+                            writer.write(chunk.encode("utf-8"))
+                            await writer.drain()
+                except Exception:
+                    # Fallback falls index.html noch nicht existiert
+                    from static_html import HTML_PAGE
+                    writer.write(HTML_PAGE.encode("utf-8"))
+                    await writer.drain()
 
             elif url == "/api/status":
                 gc.collect()
@@ -160,6 +173,20 @@ class WebServer:
                     else:
                         writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
                 except Exception:
+                    writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+
+            elif url == "/api/it/send" and method == "POST":
+                body = await reader.read(content_len) if content_len > 0 else b"{}"
+                try:
+                    data = json.loads(body.decode("utf-8"))
+                    if self.tx_handler:
+                        res = self.tx_handler(data)
+                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
+                        writer.write(json.dumps({"ok": True, "result": res}).encode("utf-8"))
+                    else:
+                        writer.write(b"HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\n{\"error\":\"No TX handler\"}")
+                except Exception as ex:
+                    print("TX Web-API Fehler:", ex)
                     writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
 
             elif url == "/api/live":

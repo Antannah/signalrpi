@@ -194,6 +194,56 @@ class CC1101:
         else:
             print("Warnung: CC1101 konnte nicht in den RX-Zustand versetzt werden. State:", state)
 
+    def transmit_ook_pulses(self, gdo0_pin, pulse_seq: list, repetitions: int = 6) -> None:
+        """
+        Sendet eine Folge von High/Low-Mikrosekunden-Pulsen (OOK) über den CC1101.
+        Schaltet kurzzeitig auf TX (GDO0 als Eingang des CC1101, Ausgang des Pico),
+        taktet das Signal mit der angegebenen Anzahl an Wiederholungen (repetitions)
+        in die Luft und schaltet danach nahtlos wieder auf Continuous-RX zurück.
+        """
+        import machine
+        
+        # 1. CC1101 in IDLE versetzen
+        self._write_strobe(CC1101_SIDLE)
+        self._write_strobe(CC1101_SFTX)
+        
+        # 2. GDO0 auf asynchronen Serial Data Input (TX) konfigurieren (0x2D = Invert off, Serial Data In)
+        self._write_reg(CC1101_IOCFG0, 0x2D)
+        
+        # 3. Den Pico-GPIO temporär als Ausgang schalten (Start mit Low)
+        gdo0_pin.init(mode=Pin.OUT, value=0)
+        
+        # 4. CC1101 in den TX-Modus schalten
+        self._write_strobe(CC1101_STX)
+        # Kurze Wartezeit für Synthesizer-Lock
+        time.sleep_us(250)
+        
+        # 5. Pulssignal mit der gewünschten Anzahl an Wiederholungen aussenden
+        # Interrupts kurz deaktivieren für jitterfreies Microsekunden-Timing
+        state = machine.disable_irq()
+        try:
+            for _ in range(repetitions):
+                high = True
+                for dur in pulse_seq:
+                    gdo0_pin.value(1 if high else 0)
+                    time.sleep_us(dur)
+                    high = not high
+                gdo0_pin.value(0)
+        finally:
+            machine.enable_irq(state)
+            
+        # 6. TX beenden & zurück in IDLE
+        self._write_strobe(CC1101_SIDLE)
+        
+        # 7. GDO0 wieder als Ausgang für demodulierte RX-Daten (0x0D = Serial Data Out)
+        self._write_reg(CC1101_IOCFG0, 0x0D)
+        
+        # 8. Pico-GPIO wieder als Eingang schalten
+        gdo0_pin.init(mode=Pin.IN)
+        
+        # 9. Zurück in den Empfangsmodus (RX)
+        self.enable_rx()
+
     def get_rssi(self) -> float:
         """
         Liest den aktuellen RSSI-Wert (Signalstärke in dBm) aus.
