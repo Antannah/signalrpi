@@ -1,6 +1,7 @@
 # decoders/__init__.py -- Parser-Registry für OOK- und FSK-Protokolle
 
 from .tcm97001 import DecoderTCM97001
+from .sd_ws07 import DecoderWS07
 from .sd_ws_ook import DecoderWSOOK
 from .sd_ws_fsk import DecoderWSFSK
 from .intertechno import DecoderIntertechno
@@ -10,6 +11,7 @@ from pattern_decoder import PatternDecoder
 DECODERS_OOK = [
     DecoderIntertechno(),
     DecoderTCM97001(),
+    DecoderWS07(),
     DecoderWSOOK(),
 ]
 

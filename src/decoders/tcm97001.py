@@ -63,17 +63,17 @@ class DecoderTCM97001(BaseDecoder):
                     i += 2
                     continue
             
-            # Bei Fehlpassung Puffer zurücksetzen, wenn noch keine 36 Bits
-            if len(bits) < 36:
+            # Bei Fehlpassung Puffer zurücksetzen, wenn noch keine 32 Bits
+            if len(bits) < 32:
                 bits = []
-            elif len(bits) >= 36:
+            elif len(bits) >= 32:
                 break
             i += 1
 
-        if len(bits) < 36:
+        if len(bits) < 32:
             return None
 
-        return self._parse_bits(bits[:36], pattern.clock)
+        return self._parse_bits(bits, pattern.clock)
 
     def _decode_raw(self, pulses: list[int]) -> dict | None:
         """
@@ -95,75 +95,106 @@ class DecoderTCM97001(BaseDecoder):
                     i += 2
                     continue
             
-            if len(bits) < 36:
+            if len(bits) < 32:
                 bits = []
-            elif len(bits) >= 36:
+            elif len(bits) >= 32:
                 break
             i += 1
 
-        if len(bits) < 36:
+        if len(bits) < 32:
             return None
 
-        return self._parse_bits(bits[:36])
+        return self._parse_bits(bits)
 
     def _parse_bits(self, bits: list[int], clock: int | None = None) -> dict | None:
         """
-        Extrahiert Temperatur, Luftfeuchtigkeit, Kanal und Status aus 36 Bits.
+        Extrahiert Temperatur, Luftfeuchtigkeit, Kanal und Status aus 32 oder 36 Bits.
+        Unterstützt:
+        - NC_WS (Start mit 0x5)
+        - Prologue / FreeTec (Start mit 0x9)
+        - Rubicson (Start mit 0x8)
+        - Generische TCM97001 / ABS700 (32-36 Bit)
         """
-        # In Hex-String umwandeln (9 Hex-Zeichen)
+        # In Hex-String umwandeln
+        hex_len = (len(bits) // 4) * 4
         hex_str = ""
-        for i in range(0, 36, 4):
+        for i in range(0, hex_len, 4):
             nibble = bits[i:i+4]
             val = 0
             for bit in nibble:
                 val = (val << 1) | bit
             hex_str += "{:X}".format(val)
-            
-        # NC_WS Signale starten immer mit einer '5' im ersten Nibble
-        if hex_str[0] != '5':
+
+        if len(hex_str) < 8:
             return None
-            
-        # 1. Temperatur dekodieren (12 Bit signed aus Nibbles 4, 5, 6)
-        temp_hex = hex_str[4:7]
-        temp_val = int(temp_hex, 16)
-        
-        negative = int(hex_str[4], 16) & 0x8
-        if negative:
-            temp_val = -((~temp_val & 0x7FF) + 1)
-            
-        temperature = temp_val / 10.0
-        if temperature < -30.0 or temperature > 60.0:
-            return None
-            
-        # 2. Luftfeuchtigkeit (7 Bit aus Nibbles 7, 8)
-        humidity = int(hex_str[7:9], 16) & 0x7F
-        if humidity < 0 or humidity > 100:
-            return None
-            
-        # 3. Kanal (Bits 14-15 von Nibble 3, Wertebereich 1-3)
-        channel = (int(hex_str[3], 16) & 0x3) + 1
-        
-        # 4. Batterie-Status (Bit 12 von Nibble 3, 1 = Ok, 0 = Low)
-        batbit = (int(hex_str[3], 16) & 0x8) >> 3
-        battery_low = (batbit == 0)
-        
-        # 5. Sendemodus (Bit 13 von Nibble 3, 1 = manuell, 0 = auto)
-        mode = (int(hex_str[3], 16) & 0x4) >> 2
-        
-        # Device ID entspricht dem dezimalen Wert des ersten Bytes (hex_str[0:2])
-        device_id = str(int(hex_str[0:2], 16))
-        
-        res = {
-            "protocol": "TCM97001",
-            "device_id": device_id,
-            "data": {
-                "temperature": temperature,
-                "humidity": humidity,
-                "battery_low": battery_low,
-                "channel": channel,
-                "forced_send": bool(mode)
-            }
-        }
-        if clock:
-            res["data"]["clock"] = clock
-        return res
+
+        # Fall A: 36-Bit Standard (NC_WS, Prologue, etc.)
+        if len(hex_str) >= 9:
+            # Erlaubte Start-Nibbles für TCM97001-Familie (0x5 = NC_WS, 0x9 = Prologue, 0x8 = Rubicson)
+            first_nibble = hex_str[0]
+            if first_nibble in ('5', '9', '8'):
+                # 1. Temperatur dekodieren (12 Bit signed aus Nibbles 4, 5, 6)
+                temp_hex = hex_str[4:7]
+                temp_val = int(temp_hex, 16)
+                
+                negative = int(hex_str[4], 16) & 0x8
+                if negative:
+                    temp_val = -((~temp_val & 0x7FF) + 1)
+                    
+                temperature = temp_val / 10.0
+                if -35.0 <= temperature <= 65.0:
+                    # 2. Luftfeuchtigkeit (7 Bit aus Nibbles 7, 8)
+                    humidity = int(hex_str[7:9], 16) & 0x7F
+                    if 0 <= humidity <= 100:
+                        channel = (int(hex_str[3], 16) & 0x3) + 1
+                        batbit = (int(hex_str[3], 16) & 0x8) >> 3
+                        mode = (int(hex_str[3], 16) & 0x4) >> 2
+                        device_id = str(int(hex_str[0:2], 16))
+
+                        res = {
+                            "protocol": "TCM97001",
+                            "device_id": device_id,
+                            "data": {
+                                "temperature": temperature,
+                                "humidity": humidity,
+                                "battery_low": (batbit == 0),
+                                "channel": channel,
+                                "forced_send": bool(mode)
+                            }
+                        }
+                        if clock:
+                            res["data"]["clock"] = clock
+                        return res
+
+        # Fall B: 32-Bit Format (8 Hex-Zeichen, z.B. ABS700, Mebus, TCM 32-bit)
+        # ID: Byte 0, Nibble 2: Flags/Channel, Nibbles 3..5: Temp (oder 4..6), Nibbles 6..7: Hum
+        # Nibbles: [0, 1] [2] [3, 4, 5] [6, 7]
+        try:
+            temp_raw = int(hex_str[3:6], 16)
+            if temp_raw >= 2048:
+                temp_raw -= 4096
+            temp_val = temp_raw / 10.0
+            hum_val = int(hex_str[6:8], 16)
+
+            if -35.0 <= temp_val <= 65.0 and 0 <= hum_val <= 100:
+                ch = (int(hex_str[2], 16) & 0x3) + 1
+                bat_low = bool((int(hex_str[2], 16) & 0x8) == 0)
+                dev_id = str(int(hex_str[0:2], 16))
+
+                res = {
+                    "protocol": "TCM97001",
+                    "device_id": dev_id,
+                    "data": {
+                        "temperature": temp_val,
+                        "humidity": hum_val,
+                        "battery_low": bat_low,
+                        "channel": ch
+                    }
+                }
+                if clock:
+                    res["data"]["clock"] = clock
+                return res
+        except Exception:
+            pass
+
+        return None

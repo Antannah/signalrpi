@@ -22,6 +22,7 @@ FILES_TO_UPDATE = [
     "src/decoders/base.py",
     "src/decoders/intertechno.py",
     "src/decoders/tcm97001.py",
+    "src/decoders/sd_ws07.py",
     "src/decoders/sd_ws_ook.py",
     "src/decoders/sd_ws_fsk.py"
 ]

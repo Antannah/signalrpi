@@ -54,8 +54,12 @@ class DecoderIntertechno(BaseDecoder):
         return None
 
     def _decode_v1(self, pattern: SignalPattern) -> dict | None:
-        # IT V1 Basiszeit liegt typischerweise bei 300..450 µs
-        if not (220 <= pattern.clock <= 550):
+        # IT V1 Basiszeit liegt bei 260..420 µs (typ. 320-380 µs)
+        if not (240 <= pattern.clock <= 440):
+            return None
+
+        # Ein echtes IT V1 Telegramm hat zwingend einen Sync-/Pausen-Puls von ca. 31T (>= 20T)
+        if pattern.sync_ratio < 20.0:
             return None
 
         m = pattern.multiples
