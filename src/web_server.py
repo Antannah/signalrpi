@@ -144,7 +144,15 @@ class WebServer:
                     writer.write(json.dumps(devs).encode("utf-8"))
 
                 elif method == "POST":
-                    body = await reader.read(content_len) if content_len > 0 else b"{}"
+                    gc.collect()
+                    body = b""
+                    remaining = content_len
+                    while remaining > 0:
+                        chunk = await reader.read(min(remaining, 512))
+                        if not chunk:
+                            break
+                        body += chunk
+                        remaining -= len(chunk)
                     try:
                         new_dev = json.loads(body.decode("utf-8"))
                         # Gerät speichern (ohne MQTT-Discovery, um HTTP-Timeout zu vermeiden)

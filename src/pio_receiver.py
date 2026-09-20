@@ -102,11 +102,21 @@ class PIOReceiver:
                     self.expect_high = True  # Erwarte weiterhin den ersten echten High-Puls
                     continue
                 
+                # Schutz vor RAM-Überlauf bei dauerhaftem HF-Rauschen: Max 160 Flanken
+                if len(self.pulse_buffer) >= 160:
+                    self.pulse_buffer.clear()
+                    self.expect_high = True
+                    continue
+
                 self.pulse_buffer.append(val)
                 self.expect_high = False
             else:
                 # Low-Phase: Wert ist der Restzähler X
                 self.expect_high = True
+                
+                if len(self.pulse_buffer) >= 160:
+                    self.pulse_buffer.clear()
+                    continue
                 
                 if val == 0:
                     # Timeout erreicht -> Paketende signalisiert!

@@ -74,18 +74,38 @@ class DeviceManager:
                     self.remove_discovery(ha_id)
                 
                 dev["profile"] = profile_name
-                if profile_name == "thermo_hygro":
+                if profile_name == "switch":
+                    dev["type"] = "switch"
+                    dev["entities"] = []
+                    if "repetitions" not in dev:
+                        dev["repetitions"] = 6
+                    if dev.get("protocol") == "IT" and "it_code" not in dev:
+                        dev_id_parts = str(dev.get("device_id", "A_1_1")).split("_")
+                        fam = dev_id_parts[0] if len(dev_id_parts) > 0 else "A"
+                        grp = int(dev_id_parts[1]) if len(dev_id_parts) > 1 and dev_id_parts[1].isdigit() else 1
+                        device_num = int(dev_id_parts[2]) if len(dev_id_parts) > 2 and dev_id_parts[2].isdigit() else 1
+                        dev["it_code"] = {"family": fam, "group": grp, "device": device_num}
+                elif profile_name == "button":
+                    dev["type"] = "sensor"
+                    dev["entities"] = [
+                        {"key": "state", "name": "Taste", "icon": "mdi:remote"},
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
+                    ]
+                elif profile_name == "thermo_hygro":
+                    dev["type"] = "sensor"
                     dev["entities"] = [
                         {"key": "temperature", "name": "Temperatur", "unit": "°C", "device_class": "temperature"},
                         {"key": "humidity", "name": "Luftfeuchtigkeit", "unit": "%", "device_class": "humidity"},
                         {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
                     ]
                 elif profile_name == "thermo":
+                    dev["type"] = "sensor"
                     dev["entities"] = [
                         {"key": "temperature", "name": "Temperatur", "unit": "°C", "device_class": "temperature"},
                         {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
                     ]
                 elif profile_name == "contact":
+                    dev["type"] = "sensor"
                     dev["entities"] = [
                         {"key": "state", "name": "Zustand", "device_class": "door"},
                         {"key": "battery_low", "name": "Batterie", "device_class": "battery"}

@@ -217,8 +217,18 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
     <label style="font-size:0.8rem;color:var(--text-dim)">Gerätename:</label>
     <input id="cfg-name" class="form-input" type="text" placeholder="z.B. Wohnzimmer Thermometer">
     
-    <label style="font-size:0.8rem;color:var(--text-dim)">Erkannte Messwerte / Entitäten:</label>
-    <div id="cfg-entities-list" style="margin:8px 0 16px;display:flex;flex-direction:column;gap:8px"></div>
+    <label style="font-size:0.8rem;color:var(--text-dim)">Gerätetyp / Funktion:</label>
+    <select id="cfg-type-select" class="form-input" style="margin-bottom:12px" onchange="onCfgTypeChange()">
+      <option value="switch">🔌 Funk-Schalter (Aktor / Steckdose ein-/ausschalten)</option>
+      <option value="button">🔘 Fernbedienung / Taster (Taste für HA Automationen)</option>
+      <option value="contact">🚪 Tür- / Fensterkontakt</option>
+      <option value="sensor">🌡 Mess-Sensor (Temperatur / Feuchte / etc.)</option>
+    </select>
+    
+    <div id="cfg-entities-container">
+      <label style="font-size:0.8rem;color:var(--text-dim)">Erkannte Messwerte / Entitäten:</label>
+      <div id="cfg-entities-list" style="margin:8px 0 16px;display:flex;flex-direction:column;gap:8px"></div>
+    </div>
     
     <input type="hidden" id="cfg-edit-id" value="">
 
@@ -305,7 +315,7 @@ async function refreshDevices(){
         ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">MQTT</span>`
         : '';
 
-      let currentProf = d.profile || (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? 'contact' : 'thermo'));
+      let currentProf = d.profile || (d.type === 'switch' ? 'switch' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo')));
       let isSwitch = d.type === 'switch';
       let infoLine = '';
       if(d.protocol === 'IT_V3' && d.binary_code){
@@ -360,13 +370,13 @@ async function refreshDevices(){
           </div>
           <!-- Funktionsleiste am unteren Rand -->
           <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)" onclick="event.stopPropagation()">
-            ${!isSwitch ? `
-              <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
-                <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>Temp + Feuchte</option>
-                <option value="thermo" ${currentProf==='thermo'?'selected':''}>Nur Temperatur</option>
-                <option value="contact" ${currentProf==='contact'?'selected':''}>Tür-/Fensterkontakt</option>
-              </select>
-            ` : `<span style="font-size:0.75rem;color:var(--text-dim)">Typ: Funk-Schalter (${d.repetitions||6}x)</span>`}
+            <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
+              <option value="switch" ${currentProf==='switch'?'selected':''}>🔌 Schalter (Aktor / Steckdose)</option>
+              <option value="button" ${currentProf==='button'?'selected':''}>🔘 Fernbedienung / Taster</option>
+              <option value="contact" ${currentProf==='contact'?'selected':''}>🚪 Tür-/Fensterkontakt</option>
+              <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>🌡 Temp + Feuchte</option>
+              <option value="thermo" ${currentProf==='thermo'?'selected':''}>🌡 Nur Temperatur</option>
+            </select>
             <div style="display:flex;gap:6px">
               <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
                 ${isEn ? '📡 MQTT deregistrieren' : '📡 MQTT registrieren'}
@@ -450,6 +460,11 @@ function openEditSensorModal(dev){
     <b>Protokoll:</b> ${dev.protocol} | <b>Funk-ID:</b> <code>${dev.device_id}</code> ${dev.channel ? '| <b>Kanal:</b> '+dev.channel : ''}
   `;
   document.getElementById('cfg-name').value = dev.name;
+  let typeSel = document.getElementById('cfg-type-select');
+  if(typeSel){
+    typeSel.value = dev.profile || (dev.type === 'switch' ? 'switch' : (dev.protocol === 'IT' ? 'button' : 'sensor'));
+  }
+  onCfgTypeChange();
 
   let listEl = document.getElementById('cfg-entities-list');
   listEl.innerHTML = '';
@@ -559,6 +574,14 @@ async function saveTimeSettings(){
 }
 
 let snifferActive = false;
+function onCfgTypeChange(){
+  let t = document.getElementById('cfg-type-select').value;
+  let cont = document.getElementById('cfg-entities-container');
+  if(cont){
+    cont.style.display = (t === 'switch') ? 'none' : 'block';
+  }
+}
+
 function startSniffer(){
   let s = document.getElementById('sniffer-list');
   snifferActive = true;
@@ -571,14 +594,29 @@ function startSniffer(){
         let div = document.createElement('div');
         div.className = 'packet';
         
-        let devBadge = p.device_name ? `<span style="background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;border-radius:12px;font-weight:600;font-size:0.75rem;margin-left:6px">✔ ${p.device_name}</span>` : '';
+        // Prüfe ob Gerät bereits bekannt ist (entweder durch matched_name vom Backend oder Abgleich mit knownDevices)
+        let matchedDev = (knownDevices || []).find(d => {
+          if(d.protocol !== p.proto) return false;
+          if(p.channel && d.channel && String(d.channel) !== String(p.channel)) return false;
+          return String(d.device_id) === String(p.id);
+        });
+        let devName = p.device_name || (matchedDev ? matchedDev.name : null);
+        let devBadge = devName ? `<span style="background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;border-radius:12px;font-weight:600;font-size:0.75rem;margin-left:6px">✔ ${devName}</span>` : '';
         let dataStr = Object.entries(p.data||{}).map(([k,v])=>`${k}: <b>${v}</b>`).join(' | ');
         
         let rawBtn = p.raw ? `<button class="btn" style="background:#475569;color:#fff" onclick='openRawModal(${JSON.stringify(p)})'>🔬 Rohdaten</button>` : '';
-        let reassignBtn = p.proto!=='RAW_433' && p.proto!=='RAW_868_OOK' && p.proto!=='RAW_868_FSK' 
-          ? `<button class="btn btn-amber" onclick="openReassign('${p.proto}','${p.id}','${p.channel||''}')">Zuordnen</button>
-             <button class="btn" onclick='openAdoptModal(${JSON.stringify(p)})'>Neu anlernen</button>` 
-          : '';
+        
+        let actionBtns = '';
+        if(p.proto!=='RAW_433' && p.proto!=='RAW_868_OOK' && p.proto!=='RAW_868_FSK'){
+          if(matchedDev){
+            actionBtns = `<button class="btn" style="background:#334155;color:#fff" onclick="editDevice('${matchedDev.id}')">✏ Bearbeiten</button>`;
+          } else {
+            actionBtns = `
+              <button class="btn btn-amber" onclick="openReassign('${p.proto}','${p.id}','${p.channel||''}')">Zuordnen</button>
+              <button class="btn" onclick='openAdoptModal(${JSON.stringify(p)})'>Neu anlernen</button>
+            `;
+          }
+        }
 
         div.innerHTML = `
           <div>
@@ -592,7 +630,7 @@ function startSniffer(){
           </div>
           <div style="display:flex;gap:6px">
             ${rawBtn}
-            ${reassignBtn}
+            ${actionBtns}
           </div>
         `;
         s.insertBefore(div, s.firstChild);
@@ -650,6 +688,16 @@ function openAdoptModal(pkt){
     <b>Protokoll:</b> ${pkt.proto} | <b>Funk-ID:</b> <code>${pkt.id}</code> ${pkt.channel ? '| <b>Kanal:</b> '+pkt.channel : ''}
   `;
   document.getElementById('cfg-name').value = pkt.proto + ' ' + pkt.id;
+  document.getElementById('cfg-edit-id').value = '';
+
+  // Typ-Vorbelegung: Wenn IT -> standardmäßig Schalter oder Taster
+  let typeSel = document.getElementById('cfg-type-select');
+  if(pkt.proto === 'IT' || pkt.proto === 'IT_V3'){
+    typeSel.value = 'switch';
+  } else {
+    typeSel.value = 'sensor';
+  }
+  onCfgTypeChange();
   
   // Dynamische Entitätenerkennung aus pkt.data
   let listEl = document.getElementById('cfg-entities-list');
@@ -670,7 +718,7 @@ function openAdoptModal(pkt){
     else if(key === 'battery_low') { unit = ''; devClass = 'battery'; defName = 'Batterie Status'; }
     else if(key === 'wind_speed') { unit = 'km/h'; devClass = 'wind_speed'; defName = 'Windgeschwindigkeit'; }
     else if(key === 'rain') { unit = 'mm'; devClass = 'precipitation'; defName = 'Regenmenge'; }
-    else if(key === 'state') { unit = ''; devClass = 'door'; defName = 'Kontakt Status'; }
+    else if(key === 'state') { unit = ''; devClass = (pkt.proto==='IT'?'button':'door'); defName = (pkt.proto==='IT'?'Taste / Zustand':'Kontakt Status'); }
     
     let row = document.createElement('div');
     row.className = 'cfg-ent-row';
@@ -680,11 +728,13 @@ function openAdoptModal(pkt){
       <input class="form-input ent-name" value="${defName}" style="margin:0;padding:4px 6px;flex:2;font-size:0.8rem">
       <input class="form-input ent-unit" value="${unit}" placeholder="Einheit" style="margin:0;padding:4px 6px;flex:1;font-size:0.8rem">
       <select class="form-input ent-class" style="margin:0;padding:4px 6px;flex:1.5;font-size:0.8rem">
+        <option value="switch" ${devClass==='switch'?'selected':''}>Schalter</option>
+        <option value="button" ${devClass==='button'?'selected':''}>Taste (Fernbedienung)</option>
+        <option value="door" ${devClass==='door'?'selected':''}>Kontakt (Tür/Fenster)</option>
         <option value="temperature" ${devClass==='temperature'?'selected':''}>Temperatur</option>
         <option value="humidity" ${devClass==='humidity'?'selected':''}>Feuchtigkeit</option>
         <option value="battery" ${devClass==='battery'?'selected':''}>Batterie</option>
         <option value="wind_speed" ${devClass==='wind_speed'?'selected':''}>Wind</option>
-        <option value="door" ${devClass==='door'?'selected':''}>Kontakt</option>
         <option value="sensor" ${devClass==='sensor'?'selected':''}>Allgemein</option>
       </select>
     `;
@@ -714,23 +764,25 @@ async function saveConfiguredDevice(){
     .replace(/ß/g, 'ss')
     .replace(/[^a-z0-9]/g, '_');
   
-  // Im zweistufigen Workflow: Standardmäßig false (erst via "MQTT registrieren" scharf schalten),
-  // außer bei Bearbeitung eines Geräts, bei dem der bestehende Zustand erhalten bleibt.
   let isEnabled = existingDev ? (existingDev.enabled !== false) : false;
+  let selectedType = document.getElementById('cfg-type-select').value;
   
   let entities = [];
-  document.querySelectorAll('.cfg-ent-row').forEach(row=>{
-    let cb = row.querySelector('.ent-enable');
-    if(cb && cb.checked){
-      let key = cb.getAttribute('data-key');
-      let entName = row.querySelector('.ent-name').value.trim() || key;
-      let unit = row.querySelector('.ent-unit').value.trim();
-      let cls = row.querySelector('.ent-class').value;
-      let entObj = {key: key, name: entName, device_class: cls};
-      if(unit) entObj.unit = unit;
-      entities.push(entObj);
-    }
-  });
+  if(selectedType !== 'switch'){
+    document.querySelectorAll('.cfg-ent-row').forEach(row=>{
+      let cb = row.querySelector('.ent-enable');
+      if(cb && cb.checked){
+        let key = cb.getAttribute('data-key');
+        let entName = row.querySelector('.ent-name').value.trim() || key;
+        let unit = row.querySelector('.ent-unit').value.trim();
+        let cls = row.querySelector('.ent-class').value;
+        let entObj = {key: key, name: entName, device_class: cls};
+        if(unit) entObj.unit = unit;
+        if(cls === 'button') entObj.icon = 'mdi:remote';
+        entities.push(entObj);
+      }
+    });
+  }
   
   let payload = {
     id: safeId,
@@ -738,10 +790,26 @@ async function saveConfiguredDevice(){
     protocol: pendingAdoptPacket.proto,
     device_id: pendingAdoptPacket.id,
     channel: pendingAdoptPacket.channel ? parseInt(pendingAdoptPacket.channel) : null,
-    type: 'sensor',
+    type: (selectedType === 'switch') ? 'switch' : 'sensor',
+    profile: selectedType,
     enabled: isEnabled,
     entities: entities
   };
+
+  if(selectedType === 'switch'){
+    payload.repetitions = existingDev ? (existingDev.repetitions || 6) : 6;
+    payload.icon = 'mdi:power-socket-de';
+    if(pendingAdoptPacket.proto === 'IT'){
+      let parts = String(pendingAdoptPacket.id).split('_');
+      let fam = parts[0] || 'A';
+      let grp = parseInt(parts[1]) || 1;
+      let devNum = parseInt(parts[2]) || 1;
+      payload.it_code = {family: fam, group: grp, device: devNum};
+    } else if(pendingAdoptPacket.proto === 'IT_V3'){
+      payload.binary_code = pendingAdoptPacket.id;
+      payload.channel = pendingAdoptPacket.channel || 1;
+    }
+  }
   
   await fetch('/api/devices', {
     method: 'POST',
