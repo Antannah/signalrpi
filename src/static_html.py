@@ -242,7 +242,7 @@ async function refreshDevices(){
             </select>
             <div style="display:flex;gap:6px">
               <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
-                ${isEn ? 'Inaktivieren' : 'In MQTT aktivieren'}
+                ${isEn ? 'MQTT deregistrieren' : 'MQTT registrieren'}
               </button>
               <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">Löschen</button>
             </div>
