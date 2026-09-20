@@ -97,49 +97,31 @@ class PIOReceiver:
             
             if self.expect_high:
                 # High-Phase: Direktwert
-                # Glitch-Filter: Ignoriere extrem kurze Störimpulse (< 30 µs) oder Überläufe (>= 0x7FFFFFFF)
-                if val < 30 or val >= 0x7FFFFFFF or val > 100000:
-                    if len(self.pulse_buffer) == 0:
-                        self.expect_high = True  # Erwarte weiterhin den ersten echten High-Puls
-                    else:
-                        # Mitten im Paket: Der Pin fiel sofort wieder auf Low (sub-µs Glitch).
-                        # Daher lief die vorherige Low-Phase weiter -> Phasenlage NICHT invertieren!
-                        self.expect_high = False
+                # Glitch-Filter: Ignoriere extrem kurze Störimpulse (z.B. < 30 µs) zu Beginn eines Pakets
+                if val < 30 and len(self.pulse_buffer) == 0:
+                    self.expect_high = True  # Erwarte weiterhin den ersten echten High-Puls
                     continue
                 
-                # Schutz vor RAM-Überlauf bei dauerhaftem HF-Rauschen: Max 250 Flanken
-                if len(self.pulse_buffer) > 250:
-                    self.pulse_buffer.clear()
-                    self.expect_high = True
-                    continue
-
                 self.pulse_buffer.append(val)
                 self.expect_high = False
             else:
                 # Low-Phase: Wert ist der Restzähler X
                 self.expect_high = True
                 
-                if len(self.pulse_buffer) > 250:
-                    self.pulse_buffer.clear()
-                    continue
-                
                 if val == 0:
                     # Timeout erreicht -> Paketende signalisiert!
-                    duration = self.pause_threshold
-                else:
-                    duration = self.pause_threshold - val
-
-                # Falls der vorherige Eintrag bereits eine Low-Phase war (durch Glitch-Kollaps):
-                if len(self.pulse_buffer) > 0 and (len(self.pulse_buffer) % 2 == 0):
-                    self.pulse_buffer[-1] += duration
-                else:
-                    self.pulse_buffer.append(duration)
-
-                if val == 0:
+                    # Hänge die Timeout-Pause an das Paket an
+                    self.pulse_buffer.append(self.pause_threshold)
+                    
                     packet = None
                     if len(self.pulse_buffer) >= self.min_pulses:
                         packet = self.pulse_buffer[:]
+                    
                     self.pulse_buffer.clear()
                     return packet
+                else:
+                    # Normaler Übergang: Berechne Dauer = Timeout - X
+                    duration = self.pause_threshold - val
+                    self.pulse_buffer.append(duration)
                     
         return None
