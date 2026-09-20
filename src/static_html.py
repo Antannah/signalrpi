@@ -89,21 +89,24 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
         <span id="it-v3-bitcount" style="font-size:0.75rem;color:var(--accent);font-family:monospace">26 / 26 Bit</span>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px">
-        <input id="it-v3-bin" class="form-input" style="font-family:monospace;letter-spacing:1px;font-weight:600;margin:0" value="00011100110111100110100111" maxlength="26" oninput="validateITV3Bits()">
+        <input id="it-v3-bin" class="form-input" style="font-family:monospace;letter-spacing:1px;font-weight:600;margin:0" value="00011100110111100110100111" maxlength="35" oninput="validateITV3Bits()" placeholder="26 Bit (0 und 1)">
         <button class="btn" style="white-space:nowrap;background:rgba(59,130,246,0.2);color:var(--accent);border:1px solid rgba(59,130,246,0.4)" onclick="generateUniqueITV3Code()">🎲 Zufallscode</button>
       </div>
 
-      <label style="font-size:0.85rem;color:var(--text-dim)">Kanal / Unit (1..16):</label>
-      <input id="it-v3-channel" class="form-input" type="number" value="1" min="1" max="16">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <label style="font-size:0.85rem;color:var(--text-dim)">Kanal / Unit (1..16):</label>
+        <span style="font-size:0.75rem;color:var(--text-dim)">Standard: 1</span>
+      </div>
+      <input id="it-v3-channel" class="form-input" type="number" value="1" min="1" max="16" style="margin-bottom:8px">
 
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;margin:12px 0 16px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;margin:10px 0 16px">
         <input type="checkbox" id="it-v3-enabled" checked style="width:16px;height:16px">
         <span><b>Sofort für Home Assistant (MQTT) aktivieren</b></span>
       </label>
 
       <div style="display:flex;flex-wrap:wrap;gap:8px">
-        <button class="btn" onclick="saveITV3Device()" style="background:var(--accent);color:#fff;font-weight:600">💾 In HA anlegen</button>
-        <button class="btn" style="background:var(--green);color:#fff" onclick="sendITV3Command('learn')">📡 Anlernen (ON)</button>
+        <button class="btn" onclick="saveITV3Device()" style="background:var(--accent);color:#fff;font-weight:600">💾 Anlegen</button>
+        <button class="btn" style="background:var(--green);color:#fff;font-weight:600" onclick="sendITV3Command('learn')">📡 Anlernen</button>
         <button class="btn" style="background:var(--green);color:#fff" onclick="sendITV3Command('on')">EIN</button>
         <button class="btn" style="background:var(--red);color:#fff" onclick="sendITV3Command('off')">AUS</button>
       </div>
@@ -655,11 +658,26 @@ function switchITType(type){
 
 function validateITV3Bits(){
   let input = document.getElementById('it-v3-bin');
-  let clean = input.value.replace(/[^01]/g, '').slice(0, 26);
-  if(input.value !== clean) input.value = clean;
+  let raw = input.value.trim();
+  let parts = raw.split(/[ ]+/);
+
+  // Falls der Nutzer einen String wie '00011100110111100110100111 0 0000' eingibt:
+  if(parts.length >= 3 && parts[0].length === 26 && parts[2].length === 4){
+    let binCode = parts[0].replace(/[^01]/g, '');
+    let unitBits = parts[2].replace(/[^01]/g, '');
+    let unitNum = parseInt(unitBits, 2) + 1; // 0000 -> Kanal 1
+    input.value = binCode;
+    let chInput = document.getElementById('it-v3-channel');
+    if(chInput) chInput.value = unitNum;
+  } else {
+    let clean = input.value.replace(/[^01]/g, '').slice(0, 26);
+    if(input.value !== clean) input.value = clean;
+  }
+
+  let cleanVal = input.value.replace(/[^01]/g, '');
   let counter = document.getElementById('it-v3-bitcount');
-  counter.innerText = clean.length + ' / 26 Bit';
-  counter.style.color = (clean.length === 26) ? 'var(--green)' : 'var(--accent)';
+  counter.innerText = cleanVal.length + ' / 26 Bit';
+  counter.style.color = (cleanVal.length === 26) ? 'var(--green)' : 'var(--accent)';
 }
 
 function generateUniqueITV3Code(){
@@ -723,7 +741,7 @@ async function saveITV3Device(){
   });
 
   refreshDevices();
-  alert('Intertechno V3 Gerät "' + name + '" erfolgreich angelegt' + (isEnabled ? ' und für Home Assistant/MQTT aktiviert!' : ' (MQTT pausiert).'));
+  alert('Intertechno V3 Gerät "' + name + '" angelegt' + (isEnabled ? ' und für Home Assistant/MQTT aktiviert!' : ' (MQTT pausiert).'));
 }
 
 function sendITV3Command(action){
