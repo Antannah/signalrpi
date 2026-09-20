@@ -60,31 +60,6 @@ class WebServer:
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
                 writer.write(json.dumps(status).encode("utf-8"))
 
-            elif url.startswith("/api/devices"):
-                if method == "GET":
-                    devs = self.device_manager.get_all()
-                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
-                    writer.write(json.dumps(devs).encode("utf-8"))
-
-                elif method == "POST":
-                    body = await reader.read(content_len) if content_len > 0 else b"{}"
-                    try:
-                        new_dev = json.loads(body.decode("utf-8"))
-                        self.device_manager.add_or_update(new_dev)
-                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
-                    except Exception as ex:
-                        writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
-
-                elif method == "DELETE":
-                    # URL query ?id=xyz
-                    dev_id = None
-                    if "?id=" in url:
-                        dev_id = url.split("?id=")[1].split("&")[0]
-                    if dev_id and self.device_manager.delete(dev_id):
-                        writer.write(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n{\"ok\":true}")
-                    else:
-                        writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
-
             elif url.startswith("/api/devices/toggle") and method == "POST":
                 body = await reader.read(content_len) if content_len > 0 else b"{}"
                 try:
@@ -111,6 +86,31 @@ class WebServer:
                         writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
                 except Exception:
                     writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+
+            elif url.startswith("/api/devices"):
+                if method == "GET":
+                    devs = self.device_manager.get_all()
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
+                    writer.write(json.dumps(devs).encode("utf-8"))
+
+                elif method == "POST":
+                    body = await reader.read(content_len) if content_len > 0 else b"{}"
+                    try:
+                        new_dev = json.loads(body.decode("utf-8"))
+                        self.device_manager.add_or_update(new_dev)
+                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                    except Exception as ex:
+                        writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+
+                elif method == "DELETE":
+                    # URL query ?id=xyz
+                    dev_id = None
+                    if "?id=" in url:
+                        dev_id = url.split("?id=")[1].split("&")[0]
+                    if dev_id and self.device_manager.delete(dev_id):
+                        writer.write(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                    else:
+                        writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
 
             elif url == "/api/reassign" and method == "POST":
                 body = await reader.read(content_len) if content_len > 0 else b"{}"
