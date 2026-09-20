@@ -48,9 +48,8 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 
 <div id="tab-devices" class="tab-content">
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <h3>Bekannte Funk-Geräte (Home Assistant)</h3>
-      <button class="btn" onclick="refreshDevices()">Aktualisieren</button>
+    <div style="margin-bottom:1rem">
+      <h3>Bekannte Funk-Geräte</h3>
     </div>
     <div id="devices-list" class="grid">Lade Geräte...</div>
   </div>
