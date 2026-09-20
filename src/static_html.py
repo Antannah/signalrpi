@@ -201,16 +201,16 @@ async function refreshDevices(){
     c.innerHTML = knownDevices.map(d=>{
       let isEn = d.enabled !== false;
       let toggleBadge = isEn 
-        ? `<button class="btn" style="background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">MQTT: Aktiv</button>`
-        : `<button class="btn" style="background:rgba(239,68,68,0.2);color:var(--red);padding:2px 8px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">MQTT: Pausiert</button>`;
+        ? `<button class="btn" style="background:#22c55e;color:#0f172a;font-weight:700;padding:4px 12px;border-radius:6px;box-shadow:0 0 10px rgba(34,197,94,0.4)" onclick="toggleDevice('${d.id}')">MQTT: AKTIV</button>`
+        : `<button class="btn" style="background:#ef4444;color:#ffffff;font-weight:700;padding:4px 12px;border-radius:6px;box-shadow:0 0 10px rgba(239,68,68,0.4)" onclick="toggleDevice('${d.id}')">MQTT: PAUSIERT</button>`;
 
       return `
-        <div class="device-card" style="opacity:${isEn ? '1':'0.7'}">
+        <div class="device-card" style="border-left: 4px solid ${isEn ? '#22c55e' : '#ef4444'};">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <strong>${d.name}</strong>
-            <div style="display:flex;gap:6px;align-items:center">
+            <strong style="font-size:1.05rem">${d.name}</strong>
+            <div style="display:flex;gap:8px;align-items:center">
               ${toggleBadge}
-              <span style="font-size:0.75rem;color:var(--accent)">${d.protocol}</span>
+              <span style="font-size:0.75rem;color:var(--accent);font-weight:600">${d.protocol}</span>
             </div>
           </div>
           <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">

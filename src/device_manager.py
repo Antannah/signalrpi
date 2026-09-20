@@ -99,9 +99,11 @@ class DeviceManager:
     def publish_all_discovery(self):
         if not self.mqtt_client:
             return
+        import time
         for dev in self.devices:
             if dev.get("enabled", True):
                 self.publish_discovery(dev)
+                time.sleep_ms(40)
 
     def publish_discovery(self, dev):
         if not self.mqtt_client or not dev.get("enabled", True):
@@ -119,6 +121,7 @@ class DeviceManager:
             "via_device": "signalrpi_gateway"
         }
         
+        import time
         if dev_type == "sensor":
             entities = dev.get("entities", [])
             for ent in entities:
@@ -141,8 +144,14 @@ class DeviceManager:
                     
                 try:
                     self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
+                    time.sleep_ms(25)
                 except Exception as e:
                     print("HA Discovery Fehler:", e)
+                    try:
+                        self.mqtt_client.connect()
+                        self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
+                    except Exception:
+                        pass
                     
         elif dev_type == "switch":
             disc_topic = "homeassistant/switch/signalrpi_{}/config".format(dev_id)
@@ -157,18 +166,41 @@ class DeviceManager:
                 payload["icon"] = dev["icon"]
             try:
                 self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
+                time.sleep_ms(25)
             except Exception as e:
                 print("HA Discovery Fehler:", e)
+                try:
+                    self.mqtt_client.connect()
+                    self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
+                except Exception:
+                    pass
 
     def remove_discovery(self, dev_id):
         if not self.mqtt_client:
             return
-        # Leere Payload löscht die Entität in Home Assistant
-        disc_topic = "homeassistant/sensor/signalrpi_{}/config".format(dev_id)
-        try:
-            self.mqtt_client.publish(disc_topic, "", retain=True)
-        except Exception:
-            pass
+        import time
+        # Finde das Gerät um alle seine Entities sauber abzumelden
+        target_dev = None
+        for d in self.devices:
+            if d.get("id") == dev_id:
+                target_dev = d
+                break
+                
+        if target_dev and target_dev.get("type") == "sensor":
+            for ent in target_dev.get("entities", []):
+                key = ent["key"]
+                disc_topic = "homeassistant/sensor/signalrpi_{}_{}/config".format(dev_id, key)
+                try:
+                    self.mqtt_client.publish(disc_topic, "", retain=True)
+                    time.sleep_ms(20)
+                except Exception:
+                    pass
+        else:
+            disc_topic = "homeassistant/switch/signalrpi_{}/config".format(dev_id)
+            try:
+                self.mqtt_client.publish(disc_topic, "", retain=True)
+            except Exception:
+                pass
 
     def get_all(self):
         # Gib Geräte angereichert mit den letzten Messwerten zurück
