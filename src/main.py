@@ -150,8 +150,12 @@ if has_config:
                 try:
                     cc_433.transmit_ook_pulses(cc_433.gdo0_pin, pulses, repetitions=reps)
                 finally:
+                    # RX-FIFO leeren, um eigene TX-Signale zu verwerfen
+                    while rx_433.sm.rx_fifo() > 0:
+                        rx_433.sm.get()
+                    rx_433.pulse_buffer.clear()
+                    rx_433.expect_high = True
                     rx_433.sm.active(1)
-                    rx_433.sm.put(rx_433.pause_threshold)
                 print("TX 433 MHz:", proto, action.upper(), "Reps:", reps)
                 return True
         except Exception as ex:

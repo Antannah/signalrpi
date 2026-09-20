@@ -219,18 +219,13 @@ class CC1101:
         time.sleep_us(250)
         
         # 5. Pulssignal mit der gewünschten Anzahl an Wiederholungen aussenden
-        # Interrupts kurz deaktivieren für jitterfreies Microsekunden-Timing
-        state = machine.disable_irq()
-        try:
-            for _ in range(repetitions):
-                high = True
-                for dur in pulse_seq:
-                    gdo0_pin.value(1 if high else 0)
-                    time.sleep_us(dur)
-                    high = not high
-                gdo0_pin.value(0)
-        finally:
-            machine.enable_irq(state)
+        for _ in range(repetitions):
+            high = True
+            for dur in pulse_seq:
+                gdo0_pin.value(1 if high else 0)
+                time.sleep_us(dur)
+                high = not high
+            gdo0_pin.value(0)
             
         # 6. TX beenden & zurück in IDLE
         self._write_strobe(CC1101_SIDLE)

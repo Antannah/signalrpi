@@ -18,7 +18,8 @@ class WebServer:
 
     async def handle_client(self, reader, writer):
         try:
-            line = await reader.readline()
+            # 5 Sekunden Timeout für langsame oder abbrechende TCP-Verbindungen
+            line = await asyncio.wait_for(reader.readline(), 5.0)
             if not line:
                 await writer.aclose()
                 return
@@ -32,10 +33,10 @@ class WebServer:
             method = parts[0]
             url = parts[1]
 
-            # Header überlesen & Content-Length ermitteln
+            # Header überlesen & Content-Length ermitteln (mit Timeout)
             content_len = 0
             while True:
-                h = await reader.readline()
+                h = await asyncio.wait_for(reader.readline(), 3.0)
                 if not h or h == b"\r\n":
                     break
                 h_str = h.decode("utf-8").lower()
@@ -146,9 +147,38 @@ class WebServer:
                     body = await reader.read(content_len) if content_len > 0 else b"{}"
                     try:
                         new_dev = json.loads(body.decode("utf-8"))
-                        self.device_manager.add_or_update(new_dev)
-                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                        # Gerät speichern (ohne MQTT-Discovery, um HTTP-Timeout zu vermeiden)
+                        dev_id = new_dev.get("id")
+                        if dev_id:
+                            if "enabled" not in new_dev:
+                                new_dev["enabled"] = True
+                            found = False
+                            for i, ex_dev in enumerate(self.device_manager.devices):
+                                if ex_dev.get("id") == dev_id:
+                                    self.device_manager.devices[i] = new_dev
+                                    found = True
+                                    break
+                            if not found:
+                                self.device_manager.devices.append(new_dev)
+                            self.device_manager.save()
+                            # Response sofort senden
+                            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                            await writer.drain()
+                            await writer.aclose()
+                            # MQTT-Discovery NACH dem Response (entkoppelt)
+                            if self.device_manager.mqtt_client:
+                                try:
+                                    if new_dev.get("enabled", True):
+                                        self.device_manager.publish_discovery(new_dev)
+                                    else:
+                                        self.device_manager.remove_discovery(dev_id)
+                                except Exception as me:
+                                    print("MQTT Discovery Fehler (async):", me)
+                            return
+                        else:
+                            writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n{\"error\":\"missing id\"}")
                     except Exception as ex:
+                        print("Device POST Fehler:", ex)
                         writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
 
                 elif method == "DELETE":
