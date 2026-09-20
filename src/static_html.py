@@ -111,8 +111,16 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       </div>
 
       <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
-        <h4 style="color:var(--accent);margin-bottom:8px">2. Geräte-Konfiguration (Backup & Restore)</h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px">Sichere alle bekannten Geräte oder lade ein Backup wieder zurück in den Pico.</p>
+        <h4 style="color:var(--accent);margin-bottom:8px">2. Firmware-Datei (Flash)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lade eine geänderte Python-Datei (.py) direkt in das Flash-Dateisystem des Pico hoch.</p>
+        <input type="file" id="file-upload-input" accept=".py" style="font-size:0.8rem;margin-bottom:8px;color:var(--text-dim)">
+        <button class="btn btn-amber" onclick="uploadFile()">Datei flashen</button>
+        <div id="upload-status" style="font-size:0.8rem;margin-top:8px;color:var(--green)"></div>
+      </div>
+
+      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+        <h4 style="color:var(--accent);margin-bottom:8px">3. Geräte-Konfiguration (Backup & Restore)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px">Sichere alle bekannten Geräte oder lade ein devices.json Backup wieder zurück.</p>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
           <a href="/api/devices/download" download="devices.json" class="btn" style="text-decoration:none;display:inline-block">💾 Download</a>
         </div>
@@ -122,14 +130,6 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
           <button class="btn btn-amber" onclick="uploadDevicesJson()">Wiederherstellen</button>
           <div id="devices-upload-status" style="font-size:0.8rem;margin-top:6px;color:var(--green)"></div>
         </div>
-      </div>
-
-      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
-        <h4 style="color:var(--accent);margin-bottom:8px">3. Entwickler Datei-Upload (Flash)</h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lade eine beliebige .py Datei direkt vom Rechner in den Pico-Flashspeicher hoch.</p>
-        <input type="file" id="file-upload-input" style="font-size:0.8rem;margin-bottom:8px;color:var(--text-dim)">
-        <button class="btn" style="background:#64748b;color:#fff" onclick="uploadFile()">Datei hochladen</button>
-        <div id="upload-status" style="font-size:0.8rem;margin-top:8px;color:var(--green)"></div>
       </div>
     </div>
   </div>
