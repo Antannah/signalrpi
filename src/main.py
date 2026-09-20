@@ -154,6 +154,8 @@ if has_config:
         })
 
     # 7. Asynchroner Webserver starten
+    import gc
+    gc.collect()
     import uasyncio as asyncio
     from web_server import WebServer
     web_srv = WebServer(device_manager=device_mgr, sniffer_queue=sniffer_queue, wlan=wlan, port=80)

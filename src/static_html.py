@@ -32,6 +32,12 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 .form-input{width:100%;padding:8px;background:rgba(15,23,42,0.8);border:1px solid var(--border);color:#fff;border-radius:6px;margin:6px 0 12px}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);justify-content:center;align-items:center;z-index:100}
 .modal-card{background:#1e293b;border:1px solid var(--border);padding:1.5rem;border-radius:12px;width:90%;max-width:400px}
+.toast-container{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:rgba(15,23,42,0.92);backdrop-filter:blur(12px);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:10px;font-size:0.875rem;font-weight:500;box-shadow:0 10px 25px -5px rgba(0,0,0,0.5);display:flex;align-items:center;gap:10px;animation:toastIn 0.3s cubic-bezier(0.16,1,0.3,1);transition:opacity 0.3s, transform 0.3s}
+.toast.toast-success{border-color:rgba(34,197,94,0.4);color:#bbf7d0}
+.toast.toast-error{border-color:rgba(239,68,68,0.4);color:#fecaca}
+.toast.toast-info{border-color:rgba(56,189,248,0.4);color:#bae6fd}
+@keyframes toastIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -133,8 +139,8 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         <button class="btn" onclick="saveITDevice()" style="background:var(--accent);color:#fff;font-weight:600">💾 Anlegen</button>
-        <button class="btn" style="background:var(--green);color:#fff" onclick="alert('Schaltbefehl ON gesendet!')">EIN</button>
-        <button class="btn" style="background:var(--red);color:#fff" onclick="alert('Schaltbefehl OFF gesendet!')">AUS</button>
+        <button class="btn" style="background:var(--green);color:#fff" onclick="showToast('Schaltbefehl EIN an Intertechno V1 gesendet')">EIN</button>
+        <button class="btn" style="background:var(--red);color:#fff" onclick="showToast('Schaltbefehl AUS an Intertechno V1 gesendet', 'info')">AUS</button>
       </div>
     </div>
   </div>
@@ -272,13 +278,29 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       </div>
       <button class="btn" style="background:#64748b;color:#fff" onclick="closeRawModal()">Schließen</button>
     </div>
-  </div>
 </div>
+
+<div id="toast-container" class="toast-container"></div>
 
 <script>
 let knownDevices = [];
 let pendingReassign = null;
 let currentRawData = null;
+
+function showToast(msg, type='success'){
+  let container = document.getElementById('toast-container');
+  if(!container) return;
+  let toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  let icon = type === 'success' ? '✔' : (type === 'error' ? '✖' : 'ℹ');
+  toast.innerHTML = `<span style="font-weight:700">${icon}</span> <span>${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(()=>{
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(12px)';
+    setTimeout(()=> toast.remove(), 300);
+  }, 3200);
+}
 
 function showTab(tabId){
   document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
@@ -518,7 +540,7 @@ function copyRaw(fmt){
     }
   }
   navigator.clipboard.writeText(txt).then(()=>{
-    alert('In die Zwischenablage kopiert (' + fmt.toUpperCase() + ')!');
+    showToast('In die Zwischenablage kopiert (' + fmt.toUpperCase() + ')!');
   }).catch(()=>{
     prompt('Kopieren fehlgeschlagen. Hier manuell kopieren:', txt);
   });
@@ -549,19 +571,23 @@ function openAdoptModal(pkt){
     else if(key === 'humidity') { unit = '%'; devClass = 'humidity'; defName = 'Luftfeuchtigkeit'; }
     else if(key === 'battery_low') { unit = ''; devClass = 'battery'; defName = 'Batterie Status'; }
     else if(key === 'wind_speed') { unit = 'km/h'; devClass = 'wind_speed'; defName = 'Windgeschwindigkeit'; }
-    else if(key === 'rain') { unit = 'mm'; devClass = 'precipitation'; defName = 'Niederschlag'; }
-    else if(key === 'state' || key === 'contact') { unit = ''; devClass = 'door'; defName = 'Zustand'; }
+    else if(key === 'rain') { unit = 'mm'; devClass = 'precipitation'; defName = 'Regenmenge'; }
+    else if(key === 'state') { unit = ''; devClass = 'door'; defName = 'Kontakt Status'; }
     
     let row = document.createElement('div');
     row.className = 'cfg-ent-row';
-    row.style = 'display:grid;grid-template-columns:24px 1fr 1fr 80px;gap:6px;align-items:center;background:rgba(255,255,255,0.02);padding:6px;border-radius:6px';
+    row.style = 'display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.02);padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)';
     row.innerHTML = `
-      <input type="checkbox" checked class="ent-enable" data-key="${key}" style="width:16px;height:16px">
-      <input type="text" class="ent-name form-input" style="margin:0;padding:4px 8px;font-size:0.8rem" value="${defName}" placeholder="Name">
-      <input type="text" class="ent-unit form-input" style="margin:0;padding:4px 8px;font-size:0.8rem" value="${unit}" placeholder="Einheit">
-      <select class="ent-class form-input" style="margin:0;padding:4px 4px;font-size:0.75rem">
-        <option value="sensor" ${devClass!=='battery'?'selected':''}>Sensor</option>
-        <option value="binary_sensor" ${devClass==='battery'?'selected':''}>Binär</option>
+      <input type="checkbox" class="ent-enable" data-key="${key}" checked style="width:16px;height:16px">
+      <input class="form-input ent-name" value="${defName}" style="margin:0;padding:4px 6px;flex:2;font-size:0.8rem">
+      <input class="form-input ent-unit" value="${unit}" placeholder="Einheit" style="margin:0;padding:4px 6px;flex:1;font-size:0.8rem">
+      <select class="form-input ent-class" style="margin:0;padding:4px 6px;flex:1.5;font-size:0.8rem">
+        <option value="temperature" ${devClass==='temperature'?'selected':''}>Temperatur</option>
+        <option value="humidity" ${devClass==='humidity'?'selected':''}>Feuchtigkeit</option>
+        <option value="battery" ${devClass==='battery'?'selected':''}>Batterie</option>
+        <option value="wind_speed" ${devClass==='wind_speed'?'selected':''}>Wind</option>
+        <option value="door" ${devClass==='door'?'selected':''}>Kontakt</option>
+        <option value="sensor" ${devClass==='sensor'?'selected':''}>Allgemein</option>
       </select>
     `;
     listEl.appendChild(row);
@@ -578,7 +604,7 @@ function closeConfigModal(){
 async function saveConfiguredDevice(){
   if(!pendingAdoptPacket) return;
   let name = document.getElementById('cfg-name').value.trim();
-  if(!name) { alert('Bitte einen Namen angeben'); return; }
+  if(!name) { showToast('Bitte einen Namen angeben', 'error'); return; }
   
   let safeId = name.toLowerCase()
     .replace(/ä/g, 'ae')
@@ -620,7 +646,7 @@ async function saveConfiguredDevice(){
   
   closeConfigModal();
   refreshDevices();
-  alert('Gerät "'+name+'" wurde erfolgreich angelegt' + (isEnabled ? ' und für Home Assistant/MQTT freigegeben!' : ' (MQTT pausiert).'));
+  showToast('Gerät "' + name + '" erfolgreich angelegt' + (isEnabled ? ' (MQTT aktiv)' : ' (MQTT pausiert)'));
 }
 
 function openReassign(proto, id, ch){
@@ -645,7 +671,7 @@ async function executeReassign(){
   });
   closeModal();
   refreshDevices();
-  alert('Funk-ID erfolgreich aktualisiert! Die Home Assistant Kurven laufen nahtlos weiter.');
+  showToast('Funk-ID erfolgreich aktualisiert!');
 }
 
 function switchITType(type){
@@ -715,7 +741,7 @@ async function saveITV3Device(){
 
   let binInput = document.getElementById('it-v3-bin').value.trim().replace(/[^01]/g, '');
   if(binInput.length !== 26){
-    alert('Der Intertechno V3 Binärcode muss exakt 26 Bit (0 und 1) lang sein! Aktuell: ' + binInput.length + ' Bit');
+    showToast('Intertechno V3 Code muss 26 Bit lang sein (aktuell ' + binInput.length + ')', 'error');
     return;
   }
 
@@ -747,26 +773,26 @@ async function saveITV3Device(){
   });
 
   refreshDevices();
-  alert('Intertechno V3 Gerät "' + name + '" angelegt' + (isEnabled ? ' und für Home Assistant/MQTT aktiviert!' : ' (MQTT pausiert).'));
+  showToast('Intertechno V3 Gerät "' + name + '" angelegt' + (isEnabled ? ' (MQTT aktiv)' : ' (MQTT pausiert)'));
 }
 
 function sendITV3Command(action){
   let bin = document.getElementById('it-v3-bin').value.trim().replace(/[^01]/g, '');
   if(bin.length !== 26){
-    alert('Bitte zuerst einen gültigen 26-Bit Binärcode eingeben/generieren!');
+    showToast('Bitte zuerst einen gültigen 26-Bit Code eingeben!', 'error');
     return;
   }
   let ch = parseInt(document.getElementById('it-v3-channel').value) || 1;
   if(action === 'learn'){
-    alert('Anlernsignal an Steckdose gesendet (Code: ' + bin + ', Kanal: ' + ch + '). Steckdose sollte nun quittieren!');
+    showToast('📡 Anlernsignal gesendet (Code: ' + bin + ', Ch: ' + ch + ')');
   } else {
-    alert('Befehl ' + action.toUpperCase() + ' an Intertechno V3 gesendet (Code: ' + bin + ', Kanal: ' + ch + ')');
+    showToast('Befehl ' + action.toUpperCase() + ' an Intertechno V3 gesendet', action==='on'?'success':'info');
   }
 }
 
 async function saveITDevice(){
   let name = document.getElementById('it-name').value.trim();
-  if(!name){ alert('Bitte einen Gerätenamen angeben'); return; }
+  if(!name){ showToast('Bitte einen Gerätenamen angeben', 'error'); return; }
   let fam = document.getElementById('it-family').value.toUpperCase();
   let grp = parseInt(document.getElementById('it-group').value) || 1;
   let dev = parseInt(document.getElementById('it-device').value) || 1;
@@ -792,7 +818,7 @@ async function saveITDevice(){
     })
   });
   refreshDevices();
-  alert('Intertechno V1 Schalter "' + name + '" angelegt' + (isEnabled ? ' und für Home Assistant/MQTT aktiviert!' : ' (MQTT pausiert).'));
+  showToast('Intertechno V1 Schalter "' + name + '" angelegt' + (isEnabled ? ' (MQTT aktiv)' : ' (MQTT pausiert)'));
 }
 
 async function triggerGitHubOTA(){
@@ -815,7 +841,7 @@ async function uploadFile(){
   let input = document.getElementById('file-upload-input');
   let st = document.getElementById('upload-status');
   if(!input.files || !input.files[0]){
-    alert('Bitte zuerst eine Datei auswählen!');
+    showToast('Bitte zuerst eine Datei auswählen!', 'error');
     return;
   }
   let file = input.files[0];
@@ -830,14 +856,16 @@ async function uploadFile(){
       });
       if(res.ok){
         st.innerText = 'Datei ' + file.name + ' erfolgreich geflasht!';
-        alert('Datei erfolgreich hochgeladen!');
+        showToast('Datei ' + file.name + ' erfolgreich hochgeladen!');
       } else {
         st.innerText = 'Fehler beim Hochladen.';
+        showToast('Fehler beim Hochladen', 'error');
       }
     };
     reader.readAsArrayBuffer(file);
   }catch(e){
     st.innerText = 'Upload fehlgeschlagen: ' + e;
+    showToast('Upload fehlgeschlagen', 'error');
   }
 }
 
@@ -845,12 +873,12 @@ async function uploadDevicesJson(){
   let input = document.getElementById('devices-upload-input');
   let st = document.getElementById('devices-upload-status');
   if(!input.files || !input.files[0]){
-    alert('Bitte zuerst eine devices.json Datei auswählen!');
+    showToast('Bitte zuerst eine devices.json Datei auswählen!', 'error');
     return;
   }
   let file = input.files[0];
   if(!file.name.endsWith('.json')){
-    alert('Bitte eine gültige .json Datei auswählen!');
+    showToast('Bitte eine gültige .json Datei auswählen!', 'error');
     return;
   }
   st.innerText = 'Lade Geräte-Konfiguration hoch...';
@@ -861,7 +889,7 @@ async function uploadDevicesJson(){
       try{
         JSON.parse(text); // Validierungsprüfung
       }catch(err){
-        alert('Ungültiges JSON-Format! Abbruch.');
+        showToast('Ungültiges JSON-Format! Abbruch.', 'error');
         st.innerText = 'Fehler: Ungültiges JSON';
         return;
       }
@@ -872,14 +900,16 @@ async function uploadDevicesJson(){
       if(res.ok){
         st.innerText = 'Geräte erfolgreich wiederhergestellt & geladen!';
         refreshDevices();
-        alert('Geräte-Konfiguration erfolgreich wiederhergestellt!');
+        showToast('Geräte-Konfiguration erfolgreich wiederhergestellt!');
       } else {
         st.innerText = 'Fehler beim Wiederherstellen.';
+        showToast('Fehler beim Wiederherstellen', 'error');
       }
     };
     reader.readAsText(file);
   }catch(e){
     st.innerText = 'Upload fehlgeschlagen: ' + e;
+    showToast('Upload fehlgeschlagen', 'error');
   }
 }
 
