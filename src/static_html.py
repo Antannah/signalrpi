@@ -90,11 +90,39 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 <div id="tab-system" class="tab-content" style="display:none">
   <div class="card">
     <h3>System Status & Diagnose</h3>
-    <div class="val-grid" style="max-width:400px;margin-top:1rem">
+    <div class="val-grid" style="max-width:500px;margin-top:1rem">
+      <div class="val-box"><div class="val-title">Systemzeit</div><div class="val-num" id="s-time">...</div></div>
       <div class="val-box"><div class="val-title">IP-Adresse</div><div class="val-num" id="s-ip">...</div></div>
       <div class="val-box"><div class="val-title">WLAN Signal</div><div class="val-num" id="s-rssi">...</div></div>
       <div class="val-box"><div class="val-title">Freier RAM</div><div class="val-num" id="s-ram">...</div></div>
-      <div class="val-box"><div class="val-title">MQTT Broker</div><div class="val-num" id="s-mqtt">Verbunden</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🕒 Datum, Uhrzeit & NTP-Zeitzone</h3>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin:8px 0 16px">SignalRPI synchronisiert die Uhrzeit automatisch beim Booten über Deinen Router (FRITZ!Box) oder NTP-Pool.</p>
+    <div style="max-width:440px;background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+      <label style="font-size:0.8rem;color:var(--text-dim)">Zeitzone (Basis-Offset zu UTC):</label>
+      <select id="tz-offset" class="form-input" style="margin-bottom:10px">
+        <option value="0">UTC +0 (London, WET)</option>
+        <option value="1" selected>UTC +1 (Berlin, Rom, Paris, MEZ)</option>
+        <option value="2">UTC +2 (Helsinki, Athen, OEZ)</option>
+        <option value="-5">UTC -5 (New York, EST)</option>
+        <option value="-8">UTC -8 (Los Angeles, PST)</option>
+      </select>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;margin-bottom:12px">
+        <input type="checkbox" id="tz-auto-dst" checked style="width:16px;height:16px">
+        <span><b>Automatische EU-Sommerzeit</b> (MESZ: März bis Oktober +1h)</span>
+      </label>
+
+      <label style="font-size:0.8rem;color:var(--text-dim)">NTP-Server (optional, leer lassen für Auto-Erkennung):</label>
+      <input type="text" id="tz-server" class="form-input" placeholder="Automatisch: Router-Gateway / pool.ntp.org" style="margin-bottom:12px">
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-amber" onclick="saveTimeSettings()">Speichern & Jetzt synchronisieren</button>
+        <span id="tz-status" style="font-size:0.8rem;color:var(--green)"></span>
+      </div>
     </div>
   </div>
 
@@ -302,10 +330,45 @@ async function updateSystem(){
   try{
     let res = await fetch('/api/status');
     let s = await res.json();
+    if(s.time) document.getElementById('s-time').innerText = s.time;
     document.getElementById('s-ip').innerText = s.ip;
     document.getElementById('s-rssi').innerText = s.wifi_rssi+' dBm';
     document.getElementById('s-ram').innerText = Math.round(s.free_ram/1024)+' kB';
   }catch(e){}
+}
+
+async function loadTimeSettings(){
+  try{
+    let res = await fetch('/api/time');
+    let cfg = await res.json();
+    if(cfg.tz_offset !== undefined) document.getElementById('tz-offset').value = cfg.tz_offset;
+    if(cfg.auto_dst !== undefined) document.getElementById('tz-auto-dst').checked = cfg.auto_dst;
+    if(cfg.custom_ntp) document.getElementById('tz-server').value = cfg.custom_ntp;
+  }catch(e){}
+}
+
+async function saveTimeSettings(){
+  let offset = parseInt(document.getElementById('tz-offset').value);
+  let autoDst = document.getElementById('tz-auto-dst').checked;
+  let customNtp = document.getElementById('tz-server').value.trim();
+  let st = document.getElementById('tz-status');
+  st.innerText = 'Synchronisiere...';
+  try{
+    let res = await fetch('/api/time', {
+      method: 'POST',
+      body: JSON.stringify({tz_offset: offset, auto_dst: autoDst, custom_ntp: customNtp})
+    });
+    let r = await res.json();
+    if(r.ok && r.time){
+      st.innerText = '✔ ' + r.time + ' (' + (r.server||'NTP') + ')';
+      updateSystem();
+      refreshDevices();
+    } else {
+      st.innerText = 'Fehler beim Synchronisieren';
+    }
+  }catch(e){
+    st.innerText = 'Fehler: ' + e;
+  }
 }
 
 function startSniffer(){
@@ -617,6 +680,7 @@ async function uploadDevicesJson(){
 
 refreshDevices();
 updateSystem();
+loadTimeSettings();
 startSniffer();
 setInterval(updateSystem, 5000);
 setInterval(refreshDevices, 3000);

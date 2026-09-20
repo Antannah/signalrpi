@@ -57,8 +57,35 @@ class WebServer:
                     "free_ram": gc.mem_free(),
                     "allocated_ram": gc.mem_alloc()
                 }
+                try:
+                    import time
+                    t = time.localtime()
+                    status["time"] = "{:02d}:{:02d}:{:02d}".format(t[3], t[4], t[5])
+                except Exception:
+                    pass
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
                 writer.write(json.dumps(status).encode("utf-8"))
+
+            elif url == "/api/time" and method == "GET":
+                import time_sync
+                cfg = time_sync.load_time_config()
+                import time
+                t = time.localtime()
+                cfg["current_time"] = "{:02d}:{:02d}:{:02d}".format(t[3], t[4], t[5])
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
+                writer.write(json.dumps(cfg).encode("utf-8"))
+
+            elif url == "/api/time" and method == "POST":
+                body = await reader.read(content_len) if content_len > 0 else b"{}"
+                try:
+                    import time_sync
+                    new_cfg = json.loads(body.decode("utf-8"))
+                    time_sync.save_time_config(new_cfg)
+                    ok, timestr, srv = time_sync.sync_time(self.wlan)
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
+                    writer.write(json.dumps({"ok": True, "time": timestr, "server": srv}).encode("utf-8"))
+                except Exception as ex:
+                    writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
 
             elif url == "/api/devices/download":
                 try:

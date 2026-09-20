@@ -83,6 +83,12 @@ if has_config:
     if wlan.isconnected():
         ip = wlan.ifconfig()[0]
         print("WLAN erfolgreich verbunden! IP-Adresse:", ip)
+        # NTP Zeitsynchronisation
+        try:
+            import time_sync
+            time_sync.sync_time(wlan)
+        except Exception as e:
+            print("Zeitsynchronisations-Fehler:", e)
     else:
         print("Warnung: WLAN-Verbindung fehlgeschlagen!")
 

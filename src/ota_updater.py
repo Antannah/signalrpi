@@ -14,6 +14,7 @@ FILES_TO_UPDATE = [
     "src/static_html.py",
     "src/cc1101.py",
     "src/pio_receiver.py",
+    "src/time_sync.py",
     "src/ota_updater.py",
     "src/decoders/__init__.py",
     "src/decoders/cul_tcm97001.py",
