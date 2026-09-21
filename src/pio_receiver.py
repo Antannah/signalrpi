@@ -57,7 +57,7 @@ def pulse_timer():
 
 
 class PIOReceiver:
-    def __init__(self, sm_id: int, pin_num: int, pause_threshold_us: int = 10000, min_pulses: int = 8):
+    def __init__(self, sm_id: int, pin_num: int, pause_threshold_us: int = 5000, min_pulses: int = 8):
         """
         Initialisiert den PIO-Empfänger für Pulse-Pause-Modulationen.
         
@@ -102,8 +102,8 @@ class PIOReceiver:
                     self.expect_high = True  # Erwarte weiterhin den ersten echten High-Puls
                     continue
                 
-                # Schutz vor RAM-Überlauf bei dauerhaftem HF-Rauschen: Max 160 Flanken
-                if len(self.pulse_buffer) >= 160:
+                # Schutz vor RAM-Überlauf bei dauerhaftem HF-Rauschen: Max 250 Flanken
+                if len(self.pulse_buffer) > 250:
                     self.pulse_buffer.clear()
                     self.expect_high = True
                     continue
@@ -114,7 +114,7 @@ class PIOReceiver:
                 # Low-Phase: Wert ist der Restzähler X
                 self.expect_high = True
                 
-                if len(self.pulse_buffer) >= 160:
+                if len(self.pulse_buffer) > 250:
                     self.pulse_buffer.clear()
                     continue
                 
