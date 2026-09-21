@@ -305,8 +305,10 @@ if has_config:
                                     state_str = str(decoded["data"].get("state", "OFF")).upper()
                                     client.publish(ha_topic, state_str, retain=True)
                                 else:
-                                    # Sensoren erhalten vollständiges JSON mit allen Entitäten
-                                    client.publish(ha_topic, json.dumps(decoded["data"]))
+                                    # Sensoren erhalten vollständiges JSON mit allen Entitäten + CC1101-RSSI
+                                    state_data = dict(decoded["data"])
+                                    state_data["rssi"] = round(rssi, 1)
+                                    client.publish(ha_topic, json.dumps(state_data))
                         else:
                             client.publish("signalrpi/raw/433", json.dumps({
                                 "rssi": rssi,
