@@ -96,13 +96,15 @@ class DeviceManager:
                     dev["entities"] = [
                         {"key": "temperature", "name": "Temperatur", "unit": "°C", "device_class": "temperature"},
                         {"key": "humidity", "name": "Luftfeuchtigkeit", "unit": "%", "device_class": "humidity"},
-                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"},
+                        {"key": "rssi", "name": "Empfangsstärke", "unit": "dBm", "device_class": "signal_strength", "icon": "mdi:signal"}
                     ]
                 elif profile_name == "thermo":
                     dev["type"] = "sensor"
                     dev["entities"] = [
                         {"key": "temperature", "name": "Temperatur", "unit": "°C", "device_class": "temperature"},
-                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"}
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"},
+                        {"key": "rssi", "name": "Empfangsstärke", "unit": "dBm", "device_class": "signal_strength", "icon": "mdi:signal"}
                     ]
                 elif profile_name == "contact":
                     dev["type"] = "sensor"
@@ -199,6 +201,9 @@ class DeviceManager:
             "via_device": "signalrpi_gateway"
         }
         
+        # Numerische device_class → state_class: measurement (Pflicht ab HA 2023)
+        _MEASUREMENT_CLASSES = {"temperature", "humidity", "signal_strength", "illuminance",
+                                 "pressure", "power", "current", "voltage", "energy"}
         import time
         if dev_type == "sensor":
             entities = dev.get("entities", [])
@@ -215,19 +220,22 @@ class DeviceManager:
                 }
                 if "unit" in ent:
                     payload["unit_of_measurement"] = ent["unit"]
-                if "device_class" in ent:
-                    payload["device_class"] = ent["device_class"]
+                dc = ent.get("device_class")
+                if dc:
+                    payload["device_class"] = dc
+                    if dc in _MEASUREMENT_CLASSES:
+                        payload["state_class"] = "measurement"
                 if "icon" in ent:
                     payload["icon"] = ent["icon"]
                     
                 try:
-                    self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
+                    self.mqtt_client.publish(disc_topic, json.dumps(payload).encode('utf-8'), retain=True)
                     time.sleep_ms(25)
                 except Exception as e:
                     print("HA Discovery Fehler:", e)
                     try:
                         self.mqtt_client.connect()
-                        self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
+                        self.mqtt_client.publish(disc_topic, json.dumps(payload).encode('utf-8'), retain=True)
                     except Exception:
                         pass
                     
@@ -244,7 +252,7 @@ class DeviceManager:
             if "icon" in dev:
                 payload["icon"] = dev["icon"]
             try:
-                self.mqtt_client.publish(disc_topic, json.dumps(payload), retain=True)
+                self.mqtt_client.publish(disc_topic, json.dumps(payload).encode('utf-8'), retain=True)
                 time.sleep_ms(25)
             except Exception as e:
                 print("HA Discovery Fehler (Switch):", e)
