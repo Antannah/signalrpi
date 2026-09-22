@@ -357,7 +357,7 @@ class CC1101:
             CC1101_PKTCTRL1: 0x04,  # Append status bytes RSSI/LQI at the end of packet (Bit 2 = 1)
             CC1101_PKTCTRL0: 0x00,  # Fixed packet length mode
             0x06:            0x0E,  # PKTLEN (Packet Length) = 14 Bytes
-            CC1101_MDMCFG4:  0x5A,  # Channel bandwidth = 135 kHz, DRATE_E = 10
+            CC1101_MDMCFG4:  0x59,  # Channel bandwidth = 325 kHz, DRATE_E = 9 (→ 17.26 kBaud mit MDMCFG3=0x5C)
             CC1101_MDMCFG3:  0x5C,  # Symbol rate = 17.26 kBaud
             CC1101_MDMCFG2:  0x02,  # 2-FSK, 16/16 sync word bits detected (2DD4)
             0x13:            0x22,  # MDMCFG1: 2 preamble bytes, no channel spacing
