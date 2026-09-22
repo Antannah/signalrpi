@@ -357,18 +357,19 @@ class CC1101:
             CC1101_PKTCTRL1: 0x04,  # Append status bytes RSSI/LQI at the end of packet (Bit 2 = 1)
             CC1101_PKTCTRL0: 0x00,  # Fixed packet length mode
             0x06:            0x0E,  # PKTLEN (Packet Length) = 14 Bytes
-            CC1101_MDMCFG4:  0x59,  # Channel bandwidth = 325 kHz, DRATE_E = 9 (→ 17.26 kBaud mit MDMCFG3=0x5C)
+            CC1101_MDMCFG4:  0xA9,  # Bandwidth = 135 kHz (CHANBW_E=2, CHANBW_M=2), DRATE_E=9 -> 17.26 kBaud
             CC1101_MDMCFG3:  0x5C,  # Symbol rate = 17.26 kBaud
             CC1101_MDMCFG2:  0x02,  # 2-FSK, 16/16 sync word bits detected (2DD4)
             0x13:            0x22,  # MDMCFG1: 2 preamble bytes, no channel spacing
             0x14:            0xF8,  # MDMCFG0: Channel spacing
             0x15:            0x42,  # DEVIATN = 34.91 kHz
+            CC1101_FSCTRL1:  0x06,  # IF = 6 * 26MHz / 1024 = 152 kHz (SIGNALduino-Standard fuer 868 MHz FSK)
             CC1101_MCSM0:    0x18,  # Autocalibrate on IDLE -> RX/TX
             CC1101_FOCCFG:   0x16,  # Frequency Offset Compensation
             CC1101_BSCFG:    0x6C,  # Bit Synchronization
-            CC1101_AGCCTRL2: 0x07,  # AGC: MAX_DVGA=00 (kein Limit), MAX_LNA=000, MAGN_TARGET=111 (42 dB, max. Empfindlichkeit)
-            CC1101_AGCCTRL1: 0x00,  # AGC: Carrier-Sense-Schwelle deaktiviert
-            CC1101_AGCCTRL0: 0x91,  # AGC: mittlere Hysterese, 16 Samples, normaler Betrieb
+            CC1101_AGCCTRL2: 0x43,  # AGC: rAmpl=33 dB, max LNA gain (sduinoESP Fine_Offset_WH51_868)
+            CC1101_AGCCTRL1: 0x68,  # AGC: sens=8 dB, LNA-Prioritaet (sduinoESP Fine_Offset_WH51_868)
+            CC1101_AGCCTRL0: 0x91,  # AGC: mittlere Hysterese, 16 Samples
             # Calibration
             CC1101_FSCAL3:   0xE9,
             CC1101_FSCAL2:   0x2A,
