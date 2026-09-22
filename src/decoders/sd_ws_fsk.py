@@ -54,7 +54,7 @@ class DecoderWSFSK(BaseDecoder):
             moisture = float(packet[6])
             
             # 10-Bit ADC-Wert (Bit 62-71: LSBs von Byte 7 + Byte 8)
-            adc = ((packet[7] & 0x03) << 8) | packet[8]
+            adc = ((packet[7] & 0x01) << 8) | packet[8]  # 9-Bit ADC: nur Bit 0 von Byte 7 als MSB
             
             # Plausibilität prüfen
             if moisture < 0.0 or moisture > 100.0:

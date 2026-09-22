@@ -62,8 +62,8 @@ if has_config:
     rx_433 = PIOReceiver(sm_id=0, pin_num=6)
     
     if mode_868 == "FSK":
-        print("868 MHz Empfänger im FSK-Paketmodus (868.35 MHz) initialisiert.")
-        cc_868.init_fsk_packet(868.35)
+        print("868 MHz Empfänger im FSK-Paketmodus (868.30 MHz) initialisiert.")
+        cc_868.init_fsk_packet(868.30)
         rx_868 = None
     else:
         print("868 MHz Empfänger im OOK-Modus (asynchron) initialisiert.")
@@ -365,6 +365,10 @@ if has_config:
                     rssi_val = packet_868[14]
                     rssi = (rssi_val - 256) / 2.0 - 74.0 if rssi_val >= 128 else (rssi_val / 2.0) - 74.0
                     decoded = decoders.decode_fsk_packet(payload)
+                    
+                    # Debug: Rohbytes immer ausgeben, damit Decoder-Probleme sichtbar werden
+                    print("[868 FSK] raw={} rssi={:.1f}dBm decoded={}".format(
+                        payload.hex().upper(), rssi, decoded["protocol"] if decoded else "NONE"))
                     
                     proto_name = decoded["protocol"] if decoded else "RAW_868_FSK"
                     dev_id_str = str(decoded["device_id"]) if decoded else payload[:4].hex().upper()
