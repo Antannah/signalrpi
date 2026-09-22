@@ -42,8 +42,31 @@ CC1101_FSCAL0   = 0x26  # Frequency Synthesizer Calibration
 CC1101_PATABLE  = 0x3E  # PA Table Control (8 Bytes)
 
 # CC1101 Status Registers (Read-only, require ORing with 0xC0)
+CC1101_PARTNUM  = 0x30  # Chip part number (expected 0x00)
+CC1101_VERSION  = 0x31  # Chip version (expected 0x04 or 0x14)
+CC1101_FREQEST  = 0x32  # Frequency Offset Estimate
+CC1101_LQI      = 0x33  # Demodulator estimate for Link Quality
 CC1101_RSSI     = 0x34  # Received Signal Strength Indicator
 CC1101_MARSTATE = 0x35  # Main Radio Control State Machine State
+CC1101_PKTSTATUS= 0x38  # Current GDOx status and packet status
+CC1101_RXBYTES  = 0x3B  # Underflow and number of bytes in RX FIFO
+CC1101_TXBYTES  = 0x3C  # Overflow and number of bytes in TX FIFO
+
+STATE_NAMES = {
+    0: "IDLE",
+    1: "RX",
+    2: "TX",
+    3: "FSTXON",
+    4: "CALIBRATE",
+    5: "SETTLING",
+    6: "RX_FIFO_ERROR",
+    7: "TX_FIFO_ERROR",
+    13: "RX (Active)",
+    14: "RX (Active)",
+    15: "RX (Active)",
+    19: "TX (Active)",
+    20: "TX_END"
+}
 
 class CC1101:
     def __init__(self, spi: SPI, cs_pin: Pin, gdo0_pin: Pin):
@@ -56,10 +79,46 @@ class CC1101:
         self.spi = spi
         self.cs_pin = cs_pin
         self.gdo0_pin = gdo0_pin
+        self.carrier_freq = 0.0
+        self.mode = "NONE"
+        self.last_check = {"ok": False, "msg": "Nicht initialisiert"}
         
         # CSn ist active low -> mit High initialisieren
         self.cs_pin.init(mode=Pin.OUT, value=1)
         self.gdo0_pin.init(mode=Pin.IN)
+
+    def check_hardware(self) -> dict:
+        """
+        Führt einen Hardware-Selbsttest über SPI durch.
+        Liest PARTNUM, VERSION und aktuellen Zustand (MARSTATE) aus.
+        """
+        try:
+            partnum = self._read_status(CC1101_PARTNUM)
+            version = self._read_status(CC1101_VERSION)
+            marstate = self._read_status(CC1101_MARSTATE) & 0x1F
+            state_str = STATE_NAMES.get(marstate, f"STATE_{marstate}")
+            
+            # Ein echter CC1101 antwortet mit PARTNUM=0x00 und VERSION=0x04 oder 0x14
+            is_valid = (partnum == 0x00 and version in [0x04, 0x14, 0x03, 0x05])
+            if is_valid:
+                msg = f"OK (v0x{version:02X}, State: {state_str})"
+            else:
+                msg = f"FEHLER: Ungültige Antwort (Part=0x{partnum:02X}, Ver=0x{version:02X})"
+                
+            self.last_check = {
+                "ok": is_valid,
+                "partnum": partnum,
+                "version": version,
+                "state_code": marstate,
+                "state_name": state_str,
+                "freq": self.carrier_freq,
+                "mode": self.mode,
+                "msg": msg
+            }
+            return self.last_check
+        except Exception as ex:
+            self.last_check = {"ok": False, "msg": f"SPI-Ausnahme: {ex}"}
+            return self.last_check
 
     def _write_reg(self, reg: int, val: int) -> None:
         """Schreibt einen Wert in ein CC1101-Register."""
@@ -131,6 +190,8 @@ class CC1101:
         Konfiguriert den CC1101 in den Continuous RX Modus (ASK/OOK Modulation).
         Der demodulierte Bitstrom wird direkt auf dem GDO0-Pin ausgegeben.
         """
+        self.carrier_freq = freq_mhz
+        self.mode = "ASK/OOK"
         self.reset()
         
         # 1. Trägerfrequenz einstellen
@@ -279,6 +340,8 @@ class CC1101:
         Die Demodulation und Rahmenerkennung (Sync-Word 2DD4) erfolgen in Hardware.
         Der fertige Paketstrom wird über die SPI-Schnittstelle ausgelesen.
         """
+        self.carrier_freq = freq_mhz
+        self.mode = "2-FSK (Sync 2DD4)"
         self.reset()
         
         # 1. Trägerfrequenz einstellen

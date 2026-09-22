@@ -41,7 +41,11 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 <body>
 <div class="header">
   <div class="brand">📻 signalrpi Gateway</div>
-  <div class="pill" id="sys-status">Online</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="pill" id="badge-cc433" style="background:rgba(255,255,255,0.05);color:var(--text-dim)">433 MHz: ...</div>
+    <div class="pill" id="badge-cc868" style="background:rgba(255,255,255,0.05);color:var(--text-dim)">868 MHz: ...</div>
+    <div class="pill" id="sys-status">Online</div>
+  </div>
 </div>
 <div class="nav">
   <button class="nav-btn active" onclick="showTab('tab-devices')">Geräte</button>
@@ -62,21 +66,26 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 <div id="tab-sniffer" class="tab-content" style="display:none">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <h3>Live Sniffer (433 & 868 MHz)</h3>
-      <span class="pill" style="background:rgba(56,189,248,0.2);color:var(--accent)">Echtzeit-Empfang</span>
+      <div>
+        <h3>Live Funk-Sniffer</h3>
+        <p style="color:var(--text-dim);font-size:0.85rem">Empfängt Live-Signale von 433.92 MHz (OOK) und 868.35 MHz (FSK).</p>
+      </div>
+      <button class="btn" id="sniffer-toggle-btn" onclick="toggleSniffer()">Starten</button>
     </div>
-    <div id="sniffer-list" class="sniffer-box">Warte auf Signale...</div>
+    <div id="sniffer-list" class="sniffer-box">Klicke auf "Starten" um Signale zu empfangen...</div>
   </div>
 </div>
 
 <div id="tab-it" class="tab-content" style="display:none">
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <h3 style="margin:0">Intertechno Funk-Geräte</h3>
-      <div style="display:flex;gap:4px;background:rgba(0,0,0,0.3);padding:3px;border-radius:6px;border:1px solid var(--border)">
-        <button id="it-type-v3-btn" class="nav-btn active" style="margin:0;padding:4px 10px;font-size:0.8rem" onclick="switchITType('v3')">V3 Selbstlernend</button>
-        <button id="it-type-v1-btn" class="nav-btn" style="margin:0;padding:4px 10px;font-size:0.8rem" onclick="switchITType('v1')">V1 Klassisch (DIP)</button>
-      </div>
+    <h3>Intertechno Fernbedienung & Anlernen</h3>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin:8px 0 16px">
+      Sende Funkbefehle zum Schalten oder Anlernen von Intertechno Funk-Steckdosen und Aktoren.
+    </p>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="it-tab-btn-v3" class="btn" onclick="switchITSubTab('v3')" style="background:var(--accent);color:#0f172a">V3 Selbstlernend (26-Bit)</button>
+      <button id="it-tab-btn-v1" class="btn" onclick="switchITSubTab('v1')" style="background:transparent;color:var(--text-dim);border:1px solid var(--border)">V1 Klassisch DIP (Hauscode)</button>
     </div>
 
     <!-- V3 Selbstlernend -->
@@ -152,6 +161,34 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       <div class="val-box"><div class="val-title">IP-Adresse</div><div class="val-num" id="s-ip">...</div></div>
       <div class="val-box"><div class="val-title">WLAN Signal</div><div class="val-num" id="s-rssi">...</div></div>
       <div class="val-box"><div class="val-title">Freier RAM</div><div class="val-num" id="s-ram">...</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📻 CC1101 Funk-Module Hardware-Diagnose</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1rem">
+      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h4 style="color:var(--accent)">Modul 1: 433 MHz</h4>
+          <span id="cc433-badge" class="pill" style="font-size:0.75rem">...</span>
+        </div>
+        <div style="font-size:0.85rem;color:var(--text-dim);line-height:1.6" id="cc433-details">Lade Details...</div>
+      </div>
+
+      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h4 style="color:var(--accent)">Modul 2: 868 MHz</h4>
+          <span id="cc868-badge" class="pill" style="font-size:0.75rem">...</span>
+        </div>
+        <div style="font-size:0.85rem;color:var(--text-dim);line-height:1.6" id="cc868-details">Lade Details...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🔔 System-Meldungen & Alerts</h3>
+    <div id="system-alerts-list" style="max-height:220px;overflow-y:auto;font-family:monospace;font-size:0.8rem;margin-top:1rem;background:rgba(15,23,42,0.8);border:1px solid var(--border);border-radius:8px;padding:8px">
+      Keine aktuellen Warnungen.
     </div>
   </div>
 
@@ -557,6 +594,73 @@ async function updateSystem(){
     document.getElementById('s-ip').innerText = s.ip;
     document.getElementById('s-rssi').innerText = s.wifi_rssi+' dBm';
     document.getElementById('s-ram').innerText = Math.round(s.free_ram/1024)+' kB';
+    
+    // 1. Modul 1 (433 MHz) Status
+    if(s.cc_433){
+      let c4 = s.cc_433;
+      let b4 = document.getElementById('badge-cc433');
+      let cb4 = document.getElementById('cc433-badge');
+      let cd4 = document.getElementById('cc433-details');
+      
+      let stText = c4.ok ? '433 MHz: OK (' + c4.state_name + ')' : '433 MHz: FEHLER';
+      let pillBg = c4.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
+      let pillColor = c4.ok ? 'var(--green)' : 'var(--red)';
+      
+      if(b4){
+        b4.innerText = stText;
+        b4.style.background = pillBg;
+        b4.style.color = pillColor;
+      }
+      if(cb4){
+        cb4.innerText = c4.state_name || (c4.ok ? 'OK' : 'FEHLER');
+        cb4.style.background = pillBg;
+        cb4.style.color = pillColor;
+      }
+      if(cd4){
+        cd4.innerHTML = '<b>Status:</b> ' + c4.msg + '<br>' +
+                        '<b>Frequenz:</b> ' + (c4.freq || 433.92) + ' MHz (' + (c4.mode || 'OOK') + ')<br>' +
+                        '<b>Chip:</b> Part 0x' + (c4.partnum !== undefined ? c4.partnum.toString(16).toUpperCase() : '??') + ' / Version 0x' + (c4.version !== undefined ? c4.version.toString(16).toUpperCase() : '??');
+      }
+    }
+    
+    // 2. Modul 2 (868 MHz) Status
+    if(s.cc_868){
+      let c8 = s.cc_868;
+      let b8 = document.getElementById('badge-cc868');
+      let cb8 = document.getElementById('cc868-badge');
+      let cd8 = document.getElementById('cc868-details');
+      
+      let stText8 = c8.ok ? '868 MHz: OK (' + c8.state_name + ')' : '868 MHz: FEHLER';
+      let pillBg8 = c8.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
+      let pillColor8 = c8.ok ? 'var(--green)' : 'var(--red)';
+      
+      if(b8){
+        b8.innerText = stText8;
+        b8.style.background = pillBg8;
+        b8.style.color = pillColor8;
+      }
+      if(cb8){
+        cb8.innerText = c8.state_name || (c8.ok ? 'OK' : 'FEHLER');
+        cb8.style.background = pillBg8;
+        cb8.style.color = pillColor8;
+      }
+      if(cd8){
+        cd8.innerHTML = '<b>Status:</b> ' + c8.msg + '<br>' +
+                        '<b>Frequenz:</b> ' + (c8.freq || 868.35) + ' MHz (' + (c8.mode || 'FSK') + ')<br>' +
+                        '<b>Chip:</b> Part 0x' + (c8.partnum !== undefined ? c8.partnum.toString(16).toUpperCase() : '??') + ' / Version 0x' + (c8.version !== undefined ? c8.version.toString(16).toUpperCase() : '??');
+      }
+    }
+    
+    // 3. System Alerts
+    if(s.alerts && s.alerts.length > 0){
+      let alertBox = document.getElementById('system-alerts-list');
+      if(alertBox){
+        alertBox.innerHTML = s.alerts.map(a => {
+          let col = a.level === 'error' ? 'var(--red)' : (a.level === 'warning' ? 'var(--amber)' : 'var(--accent)');
+          return '<div style="margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.04);padding-bottom:2px"><span style="color:var(--text-dim)">[' + a.time + ']</span> <b style="color:' + col + '">[' + a.level.toUpperCase() + ']</b> ' + a.msg + '</div>';
+        }).reverse().join('');
+      }
+    }
   }catch(e){}
 }
 

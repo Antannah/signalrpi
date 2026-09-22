@@ -69,12 +69,13 @@ class WebServer:
                     "ip": ip,
                     "wifi_rssi": getattr(self.wlan, "status")('rssi') if hasattr(self.wlan, 'status') else -50,
                     "free_ram": gc.mem_free(),
-                    "allocated_ram": gc.mem_alloc()
+                    "allocated_ram": gc.mem_alloc(),
+                    "alerts": getattr(self, "alerts", [])
                 }
                 if hasattr(self, "cc_433") and self.cc_433:
-                    status["cc_433_state"] = self.cc_433.get_radio_state()
+                    status["cc_433"] = self.cc_433.check_hardware()
                 if hasattr(self, "cc_868") and self.cc_868:
-                    status["cc_868_state"] = self.cc_868.get_radio_state()
+                    status["cc_868"] = self.cc_868.check_hardware()
                 try:
                     import time
                     t = time.localtime()

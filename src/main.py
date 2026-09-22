@@ -42,6 +42,18 @@ if has_config:
     # Betriebsmodus für 868 MHz konfigurieren (Standard: FSK)
     mode_868 = getattr(config, "MODE_868", "FSK").upper()
     
+    # Globaler Alert-Puffer für System-Ereignisse (max. 20)
+    system_alerts = []
+
+    def push_alert(level: str, msg: str):
+        t = time.localtime()
+        time_str = "{:02d}:{:02d}:{:02d}".format(t[3], t[4], t[5])
+        if len(system_alerts) > 20:
+            system_alerts.pop(0)
+        entry = {"time": time_str, "level": level, "msg": msg}
+        system_alerts.append(entry)
+        print(f"[{level.upper()}] {msg}")
+
     print("Initialisiere HF-Empfänger...")
     cc_433.init_ask_ook(433.92)
     
@@ -58,6 +70,20 @@ if has_config:
         cc_868.init_ask_ook(868.35)
         # State Machine 1 für 868 MHz (GDO0 an GP21)
         rx_868 = PIOReceiver(sm_id=1, pin_num=21)
+
+    # Hardware-Selbsttest beider CC1101-Module
+    hw_433 = cc_433.check_hardware()
+    hw_868 = cc_868.check_hardware()
+    
+    if hw_433["ok"]:
+        push_alert("info", f"CC1101 433 MHz bereit: {hw_433['msg']}")
+    else:
+        push_alert("error", f"CC1101 433 MHz FEHLER: {hw_433['msg']}")
+        
+    if hw_868["ok"]:
+        push_alert("info", f"CC1101 868 MHz bereit: {hw_868['msg']}")
+    else:
+        push_alert("error", f"CC1101 868 MHz FEHLER: {hw_868['msg']}")
     
     # 4. WLAN-Verbindung herstellen
     import network
@@ -109,11 +135,15 @@ if has_config:
             client.set_last_will("signalrpi/status", '{"state": "offline"}', retain=True, qos=1)
             client.connect()
             client.publish("signalrpi/status", '{"state": "online"}', retain=True, qos=1)
+            # Hardware Status über MQTT melden
+            client.publish("signalrpi/status/hardware", json.dumps({"cc_433": hw_433, "cc_868": hw_868}), retain=True)
             print("MQTT erfolgreich verbunden!")
         except Exception as e:
             print("MQTT-Verbindungsfehler:", e)
+            push_alert("error", f"MQTT-Verbindung fehlgeschlagen: {e}")
     else:
         print("MQTT übersprungen (kein WLAN).")
+        push_alert("warning", "WLAN nicht verbunden - MQTT und Webinterface eingeschränkt.")
 
     # 6. Device Manager & Home Assistant Auto-Discovery
     from device_manager import DeviceManager
@@ -250,6 +280,8 @@ if has_config:
     web_srv = WebServer(device_manager=device_mgr, sniffer_queue=sniffer_queue, wlan=wlan, port=80, tx_handler=handle_tx)
     web_srv.cc_433 = cc_433
     web_srv.cc_868 = cc_868
+    web_srv.alerts = system_alerts
+    web_srv.push_alert = push_alert
 
     print("\nsignalrpi ist betriebsbereit!")
     if wlan.isconnected():
