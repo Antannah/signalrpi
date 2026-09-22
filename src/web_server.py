@@ -71,6 +71,10 @@ class WebServer:
                     "free_ram": gc.mem_free(),
                     "allocated_ram": gc.mem_alloc()
                 }
+                if hasattr(self, "cc_433") and self.cc_433:
+                    status["cc_433_state"] = self.cc_433.get_radio_state()
+                if hasattr(self, "cc_868") and self.cc_868:
+                    status["cc_868_state"] = self.cc_868.get_radio_state()
                 try:
                     import time
                     t = time.localtime()

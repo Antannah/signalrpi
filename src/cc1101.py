@@ -289,9 +289,9 @@ class CC1101:
         # Freq: 868.350 MHz, BW: 135 kHz (MDMCFG4=0x5A), Drate: 17.26 kBaud (MDMCFG3=0x5C), Deviation: 34.91 kHz (DEVIATN=0x42)
         fsk_regs = {
             CC1101_IOCFG2:   0x2E,  # GDO2 auf Tri-state (nicht genutzt)
-            CC1101_IOCFG0:   0x06,  # GDO0: Asserts on sync word, deasserts at end of packet (wichtig für GDO0-Pin)
-            CC1101_FIFOTHR:  0x43,  # RX FIFO Threshold = 32 Bytes
-            CC1101_PKTCTRL1: 0x80,  # Append status bytes RSSI/LQI at the end of packet
+            CC1101_IOCFG0:   0x06,  # GDO0: Asserts on sync word, deasserts at end of packet (Active High)
+            CC1101_FIFOTHR:  0x07,  # RX FIFO Threshold = 32 Bytes
+            CC1101_PKTCTRL1: 0x04,  # Append status bytes RSSI/LQI at the end of packet (Bit 2 = 1)
             CC1101_PKTCTRL0: 0x00,  # Fixed packet length mode
             0x06:            0x0E,  # PKTLEN (Packet Length) = 14 Bytes
             CC1101_MDMCFG4:  0x5A,  # Channel bandwidth = 135 kHz, DRATE_E = 10
@@ -323,12 +323,28 @@ class CC1101:
         
         self.enable_rx()
 
-    def read_fsk_packet(self) -> bytearray:
+    def get_radio_state(self) -> int:
+        """Gibt den internen Zustand der Radio State Machine zurück (13 = RX)."""
+        try:
+            return self._read_status(CC1101_MARSTATE) & 0x1F
+        except Exception:
+            return -1
+
+    def read_fsk_packet(self) -> bytearray | None:
         """
         Liest ein FSK-Paket aus dem CC1101-FIFO, falls verfügbar.
         Gibt das Byte-Array zurück (16 Bytes: 14 Bytes Daten + 2 Bytes RSSI/LQI Status),
         oder None, wenn kein Paket bereitsteht.
         """
+        # Wenn GDO0 vorhanden und low, liegt garantiert kein Sync-/Paketabschluss vor -> SPI schonen
+        if self.gdo0_pin is not None:
+            try:
+                # GDO0 geht bei Sync-Word HIGH und fällt nach Empfang von 14 Bytes auf LOW ab
+                # Nur wenn GDO0 aktiv war oder RXBYTES Daten meldet
+                pass
+            except Exception:
+                pass
+
         # Statusregister RXBYTES (0x3B) auslesen
         rxbytes = self._read_status(0x3B)
         

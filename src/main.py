@@ -248,6 +248,8 @@ if has_config:
     import uasyncio as asyncio
     from web_server import WebServer
     web_srv = WebServer(device_manager=device_mgr, sniffer_queue=sniffer_queue, wlan=wlan, port=80, tx_handler=handle_tx)
+    web_srv.cc_433 = cc_433
+    web_srv.cc_868 = cc_868
 
     print("\nsignalrpi ist betriebsbereit!")
     if wlan.isconnected():
