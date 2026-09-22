@@ -285,7 +285,8 @@ class CC1101:
         self.set_carrier_frequency(freq_mhz)
         
         # 2. Registerkonfiguration für FSK-Paketmodus
-        # Wir übernehmen das bewährte Registerset für Fine Offset / Ecowitt FSK-Empfang
+        # Parameter gemäß FHEM/SignalDUINO Referenz:
+        # Freq: 868.350 MHz, BW: 135 kHz (MDMCFG4=0x5A), Drate: 17.26 kBaud (MDMCFG3=0x5C), Deviation: 34.91 kHz (DEVIATN=0x42)
         fsk_regs = {
             CC1101_IOCFG2:   0x2E,  # GDO2 auf Tri-state (nicht genutzt)
             CC1101_IOCFG0:   0x06,  # GDO0: Asserts on sync word, deasserts at end of packet (wichtig für GDO0-Pin)
@@ -293,16 +294,16 @@ class CC1101:
             CC1101_PKTCTRL1: 0x80,  # Append status bytes RSSI/LQI at the end of packet
             CC1101_PKTCTRL0: 0x00,  # Fixed packet length mode
             0x06:            0x0E,  # PKTLEN (Packet Length) = 14 Bytes
-            CC1101_MDMCFG4:  0xA9,  # Channel bandwidth = 100 kHz (for Fine Offset)
-            CC1101_MDMCFG3:  0x5C,  # Symbol rate
+            CC1101_MDMCFG4:  0x5A,  # Channel bandwidth = 135 kHz, DRATE_E = 10
+            CC1101_MDMCFG3:  0x5C,  # Symbol rate = 17.26 kBaud
             CC1101_MDMCFG2:  0x02,  # 2-FSK, 16/16 sync word bits detected (2DD4)
             0x13:            0x22,  # MDMCFG1: 2 preamble bytes, no channel spacing
             0x14:            0xF8,  # MDMCFG0: Channel spacing
-            0x15:            0x43,  # DEVIATN = 38 kHz
+            0x15:            0x42,  # DEVIATN = 34.91 kHz
             CC1101_MCSM0:    0x18,  # Autocalibrate on IDLE -> RX/TX
             CC1101_FOCCFG:   0x16,  # Frequency Offset Compensation
             CC1101_BSCFG:    0x6C,  # Bit Synchronization
-            CC1101_AGCCTRL2: 0x43,  # AGC Control
+            CC1101_AGCCTRL2: 0x43,  # AGC Control (rAmpl: 33 dB, sens: 8 dB)
             CC1101_AGCCTRL1: 0x68,  # AGC Control
             CC1101_AGCCTRL0: 0x91,  # AGC Control
             # Calibration
