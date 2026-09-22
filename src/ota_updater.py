@@ -11,6 +11,7 @@ FILES_TO_UPDATE = [
     "src/main.py",
     "src/web_server.py",
     "src/device_manager.py",
+    "src/index.html",
     "src/static_html.py",
     "src/cc1101.py",
     "src/pio_receiver.py",
