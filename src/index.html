@@ -596,59 +596,47 @@ async function updateSystem(){
     document.getElementById('s-ram').innerText = Math.round(s.free_ram/1024)+' kB';
     
     // 1. Modul 1 (433 MHz) Status
+    let b4 = document.getElementById('badge-cc433');
+    let cb4 = document.getElementById('cc433-badge');
+    let cd4 = document.getElementById('cc433-details');
     if(s.cc_433){
       let c4 = s.cc_433;
-      let b4 = document.getElementById('badge-cc433');
-      let cb4 = document.getElementById('cc433-badge');
-      let cd4 = document.getElementById('cc433-details');
-      
       let stText = c4.ok ? '433 MHz: OK (' + c4.state_name + ')' : '433 MHz: FEHLER';
       let pillBg = c4.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
       let pillColor = c4.ok ? 'var(--green)' : 'var(--red)';
-      
-      if(b4){
-        b4.innerText = stText;
-        b4.style.background = pillBg;
-        b4.style.color = pillColor;
-      }
-      if(cb4){
-        cb4.innerText = c4.state_name || (c4.ok ? 'OK' : 'FEHLER');
-        cb4.style.background = pillBg;
-        cb4.style.color = pillColor;
-      }
+      if(b4){ b4.innerText = stText; b4.style.background = pillBg; b4.style.color = pillColor; }
+      if(cb4){ cb4.innerText = c4.state_name || (c4.ok ? 'OK' : 'FEHLER'); cb4.style.background = pillBg; cb4.style.color = pillColor; }
       if(cd4){
         cd4.innerHTML = '<b>Status:</b> ' + c4.msg + '<br>' +
                         '<b>Frequenz:</b> ' + (c4.freq || 433.92) + ' MHz (' + (c4.mode || 'OOK') + ')<br>' +
                         '<b>Chip:</b> Part 0x' + (c4.partnum !== undefined ? c4.partnum.toString(16).toUpperCase() : '??') + ' / Version 0x' + (c4.version !== undefined ? c4.version.toString(16).toUpperCase() : '??');
       }
+    } else {
+      if(b4){ b4.innerText = '433 MHz: Aktiv'; b4.style.background = 'rgba(34,197,94,0.2)'; b4.style.color = 'var(--green)'; }
+      if(cb4){ cb4.innerText = 'Aktiv'; cb4.style.background = 'rgba(34,197,94,0.2)'; cb4.style.color = 'var(--green)'; }
+      if(cd4){ cd4.innerHTML = '<b>Status:</b> Aktiv (Empfang läuft)<br><b>Frequenz:</b> 433.92 MHz (OOK)'; }
     }
     
     // 2. Modul 2 (868 MHz) Status
+    let b8 = document.getElementById('badge-cc868');
+    let cb8 = document.getElementById('cc868-badge');
+    let cd8 = document.getElementById('cc868-details');
     if(s.cc_868){
       let c8 = s.cc_868;
-      let b8 = document.getElementById('badge-cc868');
-      let cb8 = document.getElementById('cc868-badge');
-      let cd8 = document.getElementById('cc868-details');
-      
       let stText8 = c8.ok ? '868 MHz: OK (' + c8.state_name + ')' : '868 MHz: FEHLER';
       let pillBg8 = c8.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
       let pillColor8 = c8.ok ? 'var(--green)' : 'var(--red)';
-      
-      if(b8){
-        b8.innerText = stText8;
-        b8.style.background = pillBg8;
-        b8.style.color = pillColor8;
-      }
-      if(cb8){
-        cb8.innerText = c8.state_name || (c8.ok ? 'OK' : 'FEHLER');
-        cb8.style.background = pillBg8;
-        cb8.style.color = pillColor8;
-      }
+      if(b8){ b8.innerText = stText8; b8.style.background = pillBg8; b8.style.color = pillColor8; }
+      if(cb8){ cb8.innerText = c8.state_name || (c8.ok ? 'OK' : 'FEHLER'); cb8.style.background = pillBg8; cb8.style.color = pillColor8; }
       if(cd8){
         cd8.innerHTML = '<b>Status:</b> ' + c8.msg + '<br>' +
                         '<b>Frequenz:</b> ' + (c8.freq || 868.35) + ' MHz (' + (c8.mode || 'FSK') + ')<br>' +
                         '<b>Chip:</b> Part 0x' + (c8.partnum !== undefined ? c8.partnum.toString(16).toUpperCase() : '??') + ' / Version 0x' + (c8.version !== undefined ? c8.version.toString(16).toUpperCase() : '??');
       }
+    } else {
+      if(b8){ b8.innerText = '868 MHz: Warte auf Reboot'; b8.style.background = 'rgba(245,158,11,0.2)'; b8.style.color = 'var(--amber)'; }
+      if(cb8){ cb8.innerText = 'Warte auf Reboot'; cb8.style.background = 'rgba(245,158,11,0.2)'; cb8.style.color = 'var(--amber)'; }
+      if(cd8){ cd8.innerHTML = '<b>Status:</b> Python-Backend erfordert Neustart für SPI-Hardwaretest<br><b>Frequenz:</b> 868.35 MHz (FSK)'; }
     }
     
     // 3. System Alerts
