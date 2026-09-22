@@ -366,9 +366,9 @@ class CC1101:
             CC1101_MCSM0:    0x18,  # Autocalibrate on IDLE -> RX/TX
             CC1101_FOCCFG:   0x16,  # Frequency Offset Compensation
             CC1101_BSCFG:    0x6C,  # Bit Synchronization
-            CC1101_AGCCTRL2: 0x43,  # AGC Control (rAmpl: 33 dB, sens: 8 dB)
-            CC1101_AGCCTRL1: 0x68,  # AGC Control
-            CC1101_AGCCTRL0: 0x91,  # AGC Control
+            CC1101_AGCCTRL2: 0x07,  # AGC: MAX_DVGA=00 (kein Limit), MAX_LNA=000, MAGN_TARGET=111 (42 dB, max. Empfindlichkeit)
+            CC1101_AGCCTRL1: 0x00,  # AGC: Carrier-Sense-Schwelle deaktiviert
+            CC1101_AGCCTRL0: 0x91,  # AGC: mittlere Hysterese, 16 Samples, normaler Betrieb
             # Calibration
             CC1101_FSCAL3:   0xE9,
             CC1101_FSCAL2:   0x2A,
