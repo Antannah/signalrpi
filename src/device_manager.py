@@ -202,6 +202,12 @@ class DeviceManager:
         if not self.mqtt_client:
             return
         import time
+        # Erst alle alten Topics bereinigen (verhindert Geister-Entitäten nach Profilwechsel)
+        for dev in self.devices:
+            self.remove_discovery(dev["id"])
+            time.sleep_ms(30)
+        time.sleep_ms(200)
+        # Dann aktuelle Discovery senden
         for dev in self.devices:
             if dev.get("enabled", True):
                 self.publish_discovery(dev)
