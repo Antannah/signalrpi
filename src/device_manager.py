@@ -202,12 +202,6 @@ class DeviceManager:
         if not self.mqtt_client:
             return
         import time
-        # Erst alle alten Topics bereinigen (verhindert Geister-Entitäten nach Profilwechsel)
-        for dev in self.devices:
-            self.remove_discovery(dev["id"])
-            time.sleep_ms(30)
-        time.sleep_ms(200)
-        # Dann aktuelle Discovery senden
         for dev in self.devices:
             if dev.get("enabled", True):
                 self.publish_discovery(dev)
@@ -272,7 +266,17 @@ class DeviceManager:
                         pass
                     
         elif dev_type in ["switch", "light"]:
-            # 1. Switch oder Light Entity
+            # 1. Altes komplementäres Topic löschen (verhindert switch+light Duplikat in HA)
+            other = "switch" if dev_type == "light" else "light"
+            try:
+                self.mqtt_client.publish(
+                    "homeassistant/{}/signalrpi_{}/config".format(other, dev_id),
+                    "", retain=True)
+                time.sleep_ms(25)
+            except Exception:
+                pass
+
+            # 2. Switch oder Light Entity
             component = "light" if dev_type == "light" else "switch"
             disc_topic = "homeassistant/{}/signalrpi_{}/config".format(component, dev_id)
             payload = {
