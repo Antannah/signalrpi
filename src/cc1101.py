@@ -357,9 +357,9 @@ class CC1101:
             CC1101_PKTCTRL1: 0x04,  # Append status bytes RSSI/LQI at the end of packet (Bit 2 = 1)
             CC1101_PKTCTRL0: 0x00,  # Fixed packet length mode
             0x06:            0x0E,  # PKTLEN (Packet Length) = 14 Bytes
-            CC1101_MDMCFG4:  0xA9,  # Bandwidth = 135 kHz (CHANBW_E=2, CHANBW_M=2), DRATE_E=9 -> 17.26 kBaud
+            CC1101_MDMCFG4:  0x89,  # Bandwidth = ca. 200 kHz (CHANBW_E=2, CHANBW_M=0) -> fängt Quarzdrift der Sender ab
             CC1101_MDMCFG3:  0x5C,  # Symbol rate = 17.26 kBaud
-            CC1101_MDMCFG2:  0x02,  # 2-FSK, 16/16 sync word bits detected (2DD4)
+            CC1101_MDMCFG2:  0x12,  # 2-FSK, 16/16 sync word bits (2DD4) + CARRIER SENSE (nur Träger > -90 dBm)
             0x13:            0x22,  # MDMCFG1: 2 preamble bytes, no channel spacing
             0x14:            0xF8,  # MDMCFG0: Channel spacing
             0x15:            0x42,  # DEVIATN = 34.91 kHz
@@ -400,11 +400,6 @@ class CC1101:
         Gibt das Byte-Array zurück (16 Bytes: 14 Bytes Daten + 2 Bytes RSSI/LQI Status),
         oder None, wenn kein Paket bereitsteht.
         """
-        # Wenn GDO0-Pin vorhanden: IOCFG0=0x07 geht nur auf HIGH, wenn ein Paket vollständig empfangen wurde
-        # Das verhindert unnötige SPI-Abfragen bei Rauschen
-        if self.gdo0_pin is not None and not self.gdo0_pin.value():
-            return None
-
         # Statusregister RXBYTES (0x3B) auslesen
         rxbytes = self._read_status(0x3B)
         
@@ -428,9 +423,7 @@ class CC1101:
             self._write_strobe(CC1101_SFRX)
             self._write_strobe(CC1101_SRX)
             
-            # Nur Pakete zurückgeben, die dem WH51 (0x51) oder WH40 (0x40) Family Code entsprechen
-            if packet[0] in [0x51, 0x40]:
-                return packet
+            return packet
             
         return None
 
