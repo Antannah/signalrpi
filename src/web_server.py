@@ -252,6 +252,16 @@ class WebServer:
                     print("OTA Trigger Fehler:", ex)
                 return
 
+            elif url == "/api/restart" and method == "POST":
+                # Direkter Neustart des Pico W
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                await writer.drain()
+                await writer.aclose()
+                import time, machine
+                time.sleep_ms(300)
+                machine.reset()
+                return
+
             elif url.startswith("/api/upload") and method == "POST":
                 # Datei-Upload: Ziel-Dateiname aus Query Parameter ?filename=...
                 filename = "uploaded_file.py"

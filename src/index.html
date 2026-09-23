@@ -241,6 +241,13 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
           <div id="devices-upload-status" style="font-size:0.8rem;margin-top:6px;color:var(--green)"></div>
         </div>
       </div>
+
+      <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
+        <h4 style="color:var(--red);margin-bottom:8px">4. Gateway Neustart (Reboot)</h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Führt einen Software-Warmstart des Raspberry Pi Pico W durch, um geänderte Programmdateien neu einzulesen.</p>
+        <button class="btn btn-del" onclick="rebootGateway()" id="btn-reboot">🔄 Pico W neu starten</button>
+        <div id="reboot-status" style="font-size:0.8rem;margin-top:8px;color:var(--amber)"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1243,6 +1250,18 @@ async function triggerGitHubOTA(){
     st.innerText = 'Fehler beim Auslösen des OTA Updates.';
     btn.disabled = false;
   }
+}
+
+async function rebootGateway(){
+  if(!confirm('Raspberry Pi Pico W jetzt neu starten?')) return;
+  let btn = document.getElementById('btn-reboot');
+  let st = document.getElementById('reboot-status');
+  btn.disabled = true;
+  st.innerText = 'Neustart wird ausgeführt... Verbinde in 5s neu...';
+  try{
+    await fetch('/api/restart', {method:'POST'});
+  }catch(e){}
+  setTimeout(()=>{ location.reload(); }, 5000);
 }
 
 async function uploadFile(){

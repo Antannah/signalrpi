@@ -6,6 +6,13 @@ import time
 import json
 import gc
 from machine import Pin, SPI
+
+# RT6150-Schaltregler des Pico in den PWM-Modus (CCM) zwingen.
+# Im Standard-PSM (PFM) schwingt die Schaltfrequenz lastabhängig und erzeugt
+# auf der 3V3-Schiene einen Ripple von 50–150 mV, der den CC1101 LNA/VCO stört.
+# Mit GPIO23 = HIGH: feste Taktung → Ripple < 10 mV.
+_smps_mode = machine.Pin(23, machine.Pin.OUT)
+_smps_mode.value(1)
 from cc1101 import CC1101
 from pio_receiver import PIOReceiver
 from umqtt.simple import MQTTClient
@@ -29,9 +36,11 @@ except ImportError:
 if has_config:
     # 1. SPI-Busse für CC1101-Module initialisieren (2 getrennte Hardware-Controller)
     # SPI1 (Links): GP10 = SCK, GP11 = MOSI, GP12 = MISO
-    spi1 = SPI(1, baudrate=5_000_000, polarity=0, phase=0, sck=Pin(10), mosi=Pin(11), miso=Pin(12))
+    # SPI-Takt auf 1 MHz reduziert: reicht für CC1101-Register/FIFO vollständig aus.
+    # 5 MHz erzeugte Oberwellen bei 10/15/20 MHz, die direkt in den 10,7-MHz-ZF-Pfad des CC1101 einstrahlten.
+    spi1 = SPI(1, baudrate=1_000_000, polarity=0, phase=0, sck=Pin(10), mosi=Pin(11), miso=Pin(12))
     # SPI0 (Rechts): GP18 = SCK, GP19 = MOSI, GP16 = MISO
-    spi0 = SPI(0, baudrate=5_000_000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
+    spi0 = SPI(0, baudrate=1_000_000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
     
     # 2. CC1101-Module instanziieren
     # CC1101 #1 für 433 MHz (Links): SPI1, CS = GP13, GDO0 = GP6
