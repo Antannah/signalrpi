@@ -282,10 +282,14 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
     
     <label style="font-size:0.8rem;color:var(--text-dim)">Gerätetyp / Funktion:</label>
     <select id="cfg-type-select" class="form-input" style="margin-bottom:12px" onchange="onCfgTypeChange()">
-      <option value="switch">🔌 Funk-Schalter (Aktor / Steckdose ein-/ausschalten)</option>
-      <option value="button">🔘 Fernbedienung / Taster (Taste für HA Automationen)</option>
+      <option value="switch">🔌 Funk-Schalter</option>
+      <option value="button">🔘 Fernbedienung / Taster</option>
       <option value="contact">🚪 Tür- / Fensterkontakt</option>
-      <option value="sensor">🌡 Mess-Sensor (Temperatur / Feuchte / etc.)</option>
+      <option value="thermo_hygro">🌡 Temperatur- & Feuchtesensor</option>
+      <option value="thermo">🌡 Nur Temperatursensor</option>
+      <option value="rain">🌧 Regensensor</option>
+      <option value="moisture">🌱 Bodenfeuchtesensor</option>
+      <option value="sensor">📊 Allgemeiner Mess-Sensor</option>
     </select>
     
     <div id="cfg-entities-container">
@@ -437,7 +441,7 @@ function renderDeviceCard(d){
       <!-- Funktionsleiste am unteren Rand -->
       <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)" onclick="event.stopPropagation()">
         <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
-          <option value="switch" ${currentProf==='switch'?'selected':''}>🔌 Schalter (Aktor / Steckdose)</option>
+          <option value="switch" ${currentProf==='switch'?'selected':''}>🔌 Schalter</option>
           <option value="button" ${currentProf==='button'?'selected':''}>🔘 Fernbedienung / Taster</option>
           <option value="contact" ${currentProf==='contact'?'selected':''}>🚪 Tür-/Fensterkontakt</option>
           <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>🌡 Temp + Feuchte</option>
@@ -491,13 +495,13 @@ function renderDevices(){
 
   // Helper für Profil-Labels
   let profNames = {
-    switch: '🔌 Funk-Schalter (Aktoren & Steckdosen)',
+    switch: '🔌 Funk-Schalter',
     button: '🔘 Fernbedienungen & Taster',
     contact: '🚪 Tür- & Fensterkontakte',
     thermo_hygro: '🌡 Temperatur- & Feuchtesensoren',
     thermo: '🌡 Temperatur-Sensoren',
-    rain: '🌧 Regensensoren (WH40)',
-    moisture: '🌱 Bodenfeuchte-Sensoren (WH51 / XT300)',
+    rain: '🌧 Regensensoren',
+    moisture: '🌱 Bodenfeuchte-Sensoren',
     sensor: '📊 Allgemeine Sensoren'
   };
 
@@ -657,8 +661,11 @@ function openEditSensorModal(dev){
       <input class="form-input ent-unit" value="${e.unit||''}" placeholder="Einheit" style="margin:0;padding:4px 6px;flex:1;font-size:0.8rem">
       <select class="form-input ent-class" style="margin:0;padding:4px 6px;flex:1.5;font-size:0.8rem">
         <option value="temperature" ${e.device_class==='temperature'?'selected':''}>Temperatur</option>
-        <option value="humidity" ${e.device_class==='humidity'?'selected':''}>Feuchtigkeit</option>
+        <option value="humidity" ${e.device_class==='humidity'?'selected':''}>Luftfeuchtigkeit</option>
+        <option value="moisture" ${e.device_class==='moisture'?'selected':''}>Bodenfeuchtigkeit</option>
+        <option value="precipitation" ${e.device_class==='precipitation'?'selected':''}>Regenmenge</option>
         <option value="battery" ${e.device_class==='battery'?'selected':''}>Batterie</option>
+        <option value="voltage" ${e.device_class==='voltage'?'selected':''}>Spannung (V)</option>
         <option value="wind_speed" ${e.device_class==='wind_speed'?'selected':''}>Wind</option>
         <option value="door" ${e.device_class==='door'?'selected':''}>Kontakt</option>
         <option value="sensor" ${(!e.device_class||e.device_class==='sensor')?'selected':''}>Allgemein</option>
@@ -936,10 +943,18 @@ function openAdoptModal(pkt){
   document.getElementById('cfg-edit-id').value = '';
   onCfgNameInput();
 
-  // Typ-Vorbelegung: Wenn IT -> standardmäßig Schalter oder Taster
+  // Typ-Vorbelegung anhand des Protokolls und der erkannten Daten
   let typeSel = document.getElementById('cfg-type-select');
   if(pkt.proto === 'IT' || pkt.proto === 'IT_V3'){
     typeSel.value = 'switch';
+  } else if(pkt.proto === 'SD_WS_126' || (pkt.data && (pkt.data.rain_total !== undefined || pkt.data.rain_ticks !== undefined))){
+    typeSel.value = 'rain';
+  } else if(pkt.proto === 'SD_WS_107' || pkt.proto === 'SD_WS_50' || (pkt.data && pkt.data.moisture !== undefined)){
+    typeSel.value = 'moisture';
+  } else if(pkt.data && pkt.data.temperature !== undefined && pkt.data.humidity !== undefined){
+    typeSel.value = 'thermo_hygro';
+  } else if(pkt.data && pkt.data.temperature !== undefined){
+    typeSel.value = 'thermo';
   } else {
     typeSel.value = 'sensor';
   }
@@ -982,8 +997,11 @@ function openAdoptModal(pkt){
         <option value="button" ${devClass==='button'?'selected':''}>Taste (Fernbedienung)</option>
         <option value="door" ${devClass==='door'?'selected':''}>Kontakt (Tür/Fenster)</option>
         <option value="temperature" ${devClass==='temperature'?'selected':''}>Temperatur</option>
-        <option value="humidity" ${devClass==='humidity'?'selected':''}>Feuchtigkeit</option>
+        <option value="humidity" ${devClass==='humidity'?'selected':''}>Luftfeuchtigkeit</option>
+        <option value="moisture" ${devClass==='moisture'?'selected':''}>Bodenfeuchtigkeit</option>
+        <option value="precipitation" ${devClass==='precipitation'?'selected':''}>Regenmenge</option>
         <option value="battery" ${devClass==='battery'?'selected':''}>Batterie</option>
+        <option value="voltage" ${devClass==='voltage'?'selected':''}>Spannung (V)</option>
         <option value="wind_speed" ${devClass==='wind_speed'?'selected':''}>Wind</option>
         <option value="sensor" ${devClass==='sensor'?'selected':''}>Allgemein</option>
       </select>

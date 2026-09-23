@@ -237,7 +237,7 @@ Die Skripte im Verzeichnis `src/` werden direkt auf das Flash-Dateisystem des Ra
     *   Dateien hochladen:
         ```bash
         mremote fs cp src/main.py :main.py
-        mremote fs cp -r src/decoders :decoders
+        mremote fs cp -r src/en_decoders :en_decoders
         ```
     *   Konsole öffnen: `mpremote repl`
 
@@ -274,12 +274,12 @@ MODE_868 = "FSK"
 
 *   **Verhalten bei `"FSK"`:**
     *   Der CC1101 filtert das Signal hardwareseitig auf das Sync-Word `0x2DD4`.
-    *   Valide Pakete werden per SPI-FIFO gelesen und an [decode_fsk_packet](file:///c:/Users/Norma/Documents/antigravity/signalrpi/src/decoders/__init__.py#L32) übergeben.
+    *   Valide Pakete werden per SPI-FIFO gelesen und an [decode_fsk_packet](file:///c:/Users/Norma/Documents/antigravity/signalrpi/src/en_decoders/__init__.py#L32) übergeben.
     *   Es wird keine PIO-State-Machine für diesen Empfänger belegt (Ressourceneinsparung auf dem RP2040).
 *   **Verhalten bei `"OOK"`:**
     *   Der CC1101 leitet das unstrukturierte Basisbandsignal an Pin GP21 weiter.
     *   Die **PIO State Machine 1** wird gestartet, um die Impuls- und Pausendauern zu messen.
-    *   Die resultierenden Pulsfolgen werden an [decode_signal](file:///c:/Users/Norma/Documents/antigravity/signalrpi/src/decoders/__init__.py#L46) (identisch zum 433 MHz-Pfad) übergeben.
+    *   Die resultierenden Pulsfolgen werden an [decode_signal](file:///c:/Users/Norma/Documents/antigravity/signalrpi/src/en_decoders/__init__.py#L46) (identisch zum 433 MHz-Pfad) übergeben.
 
 ---
 

@@ -16,7 +16,7 @@ _smps_mode.value(1)
 from cc1101 import CC1101
 from pio_receiver import PIOReceiver
 from umqtt.simple import MQTTClient
-import decoders
+import en_decoders as decoders
 
 # Onboard-LED für Aktivitätsanzeige (Pico W nutzt Pin 'LED' über den CYW43)
 try:
@@ -159,7 +159,7 @@ if has_config:
     device_mgr = DeviceManager(mqtt_client=client)
 
     # 7. Sende-Handler für 433 MHz (Intertechno V1 & V3)
-    from it_encoder import ITEncoder
+    from en_decoders.it_encoder import ITEncoder
 
     def handle_tx(cmd_data: dict) -> bool:
         """

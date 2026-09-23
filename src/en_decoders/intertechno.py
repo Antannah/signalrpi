@@ -1,7 +1,7 @@
 # decoders/intertechno.py -- Decoder für Intertechno V1 (Tri-State) und V3 (Manchester)
 
 from .base import BaseDecoder
-from pattern_decoder import PatternDecoder, SignalPattern
+from .pattern_decoder import PatternDecoder, SignalPattern
 
 class DecoderIntertechno(BaseDecoder):
     """

@@ -272,6 +272,17 @@ class WebServer:
                 filename = filename.replace("..", "").lstrip("/")
                 
                 try:
+                    # Stelle sicher, dass Unterverzeichnisse existieren (z. B. en_decoders/)
+                    if "/" in filename:
+                        parts = filename.split("/")
+                        cur_dir = ""
+                        for part in parts[:-1]:
+                            cur_dir = cur_dir + "/" + part if cur_dir else part
+                            try:
+                                import os
+                                os.mkdir(cur_dir)
+                            except OSError:
+                                pass
                     # Lese Dateiinhalt blockweise
                     remaining = content_len
                     with open(filename, "wb") as f:

@@ -1,7 +1,7 @@
 # decoders/tcm97001.py -- Decoder für TCM97001 (NC_WS) Wettersensoren
 
 from .base import BaseDecoder
-from pattern_decoder import PatternDecoder, SignalPattern
+from .pattern_decoder import PatternDecoder, SignalPattern
 
 class DecoderTCM97001(BaseDecoder):
     """

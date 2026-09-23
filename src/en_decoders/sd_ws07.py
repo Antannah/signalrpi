@@ -2,7 +2,7 @@
 # Protokoll 7 (FHEM SD_WS07)
 
 from .base import BaseDecoder
-from pattern_decoder import PatternDecoder, SignalPattern
+from .pattern_decoder import PatternDecoder, SignalPattern
 
 class DecoderWS07(BaseDecoder):
     """

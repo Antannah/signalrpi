@@ -1,7 +1,7 @@
 # decoders/sd_ws_ook.py -- Decoder für SD_WS_50 (XT300 Bodenfeuchtesensor)
 
 from .base import BaseDecoder
-from pattern_decoder import PatternDecoder, SignalPattern
+from .pattern_decoder import PatternDecoder, SignalPattern
 
 class DecoderWSOOK(BaseDecoder):
     """

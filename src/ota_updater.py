@@ -16,16 +16,16 @@ FILES_TO_UPDATE = [
     "src/cc1101.py",
     "src/pio_receiver.py",
     "src/time_sync.py",
-    "src/pattern_decoder.py",
-    "src/it_encoder.py",
     "src/ota_updater.py",
-    "src/decoders/__init__.py",
-    "src/decoders/base.py",
-    "src/decoders/intertechno.py",
-    "src/decoders/tcm97001.py",
-    "src/decoders/sd_ws07.py",
-    "src/decoders/sd_ws_ook.py",
-    "src/decoders/sd_ws_fsk.py"
+    "src/en_decoders/__init__.py",
+    "src/en_decoders/base.py",
+    "src/en_decoders/pattern_decoder.py",
+    "src/en_decoders/it_encoder.py",
+    "src/en_decoders/intertechno.py",
+    "src/en_decoders/tcm97001.py",
+    "src/en_decoders/sd_ws07.py",
+    "src/en_decoders/sd_ws_ook.py",
+    "src/en_decoders/sd_ws_fsk.py"
 ]
 
 def update_from_github(callback=None):
