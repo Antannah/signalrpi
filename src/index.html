@@ -693,7 +693,18 @@ async function saveTimeSettings(){
   }
 }
 
-let snifferActive = false;
+let snifferActive = true;
+let snifferStarted = false;
+
+function toggleSniffer(){
+  let btn = document.getElementById('sniffer-toggle-btn');
+  snifferActive = !snifferActive;
+  if(btn){
+    btn.innerText = snifferActive ? 'Pausieren' : 'Starten';
+    btn.className = snifferActive ? 'btn btn-amber' : 'btn';
+  }
+}
+
 function onCfgTypeChange(){
   let t = document.getElementById('cfg-type-select').value;
   let cont = document.getElementById('cfg-entities-container');
@@ -703,10 +714,16 @@ function onCfgTypeChange(){
 }
 
 function startSniffer(){
+  if(snifferStarted) return;
+  snifferStarted = true;
   let s = document.getElementById('sniffer-list');
-  snifferActive = true;
+  let btn = document.getElementById('sniffer-toggle-btn');
+  if(btn){
+    btn.innerText = 'Pausieren';
+    btn.className = 'btn btn-amber';
+  }
   let poll = async ()=>{
-    if(!snifferActive){ setTimeout(poll, 2500); return; }
+    if(!snifferActive){ setTimeout(poll, 2000); return; }
     try{
       let r = await fetch('/api/live');
       let pkts = await r.json();

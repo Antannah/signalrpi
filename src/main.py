@@ -71,12 +71,12 @@ if has_config:
     rx_433 = PIOReceiver(sm_id=0, pin_num=6)
     
     if mode_868 == "FSK":
-        print("868 MHz Empfänger im FSK-Paketmodus (868.35 MHz) initialisiert.")
-        cc_868.init_fsk_packet(868.35)
+        print("868 MHz Empfänger im FSK-Paketmodus (868.30 MHz) initialisiert.")
+        cc_868.init_fsk_packet(868.30)
         rx_868 = None
     else:
         print("868 MHz Empfänger im OOK-Modus (asynchron) initialisiert.")
-        cc_868.init_ask_ook(868.35)
+        cc_868.init_ask_ook(868.30)
         # State Machine 1 für 868 MHz (GDO0 an GP21)
         rx_868 = PIOReceiver(sm_id=1, pin_num=21)
 

@@ -400,14 +400,10 @@ class CC1101:
         Gibt das Byte-Array zurück (16 Bytes: 14 Bytes Daten + 2 Bytes RSSI/LQI Status),
         oder None, wenn kein Paket bereitsteht.
         """
-        # Wenn GDO0 vorhanden und low, liegt garantiert kein Sync-/Paketabschluss vor -> SPI schonen
-        if self.gdo0_pin is not None:
-            try:
-                # GDO0 geht bei Sync-Word HIGH und fällt nach Empfang von 14 Bytes auf LOW ab
-                # Nur wenn GDO0 aktiv war oder RXBYTES Daten meldet
-                pass
-            except Exception:
-                pass
+        # Wenn GDO0-Pin vorhanden: IOCFG0=0x07 geht nur auf HIGH, wenn ein Paket vollständig empfangen wurde
+        # Das verhindert unnötige SPI-Abfragen bei Rauschen
+        if self.gdo0_pin is not None and not self.gdo0_pin.value():
+            return None
 
         # Statusregister RXBYTES (0x3B) auslesen
         rxbytes = self._read_status(0x3B)
@@ -432,7 +428,9 @@ class CC1101:
             self._write_strobe(CC1101_SFRX)
             self._write_strobe(CC1101_SRX)
             
-            return packet
+            # Nur Pakete zurückgeben, die dem WH51 (0x51) oder WH40 (0x40) Family Code entsprechen
+            if packet[0] in [0x51, 0x40]:
+                return packet
             
         return None
 
