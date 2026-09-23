@@ -421,6 +421,8 @@ async function refreshDevices(){
               <option value="contact" ${currentProf==='contact'?'selected':''}>🚪 Tür-/Fensterkontakt</option>
               <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>🌡 Temp + Feuchte</option>
               <option value="thermo" ${currentProf==='thermo'?'selected':''}>🌡 Nur Temperatur</option>
+              <option value="rain" ${currentProf==='rain'?'selected':''}>🌧 Regensensor (WH40)</option>
+              <option value="moisture" ${currentProf==='moisture'?'selected':''}>🌱 Bodenfeuchte (WH51)</option>
             </select>
             <div style="display:flex;gap:6px">
               <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
@@ -854,8 +856,12 @@ function openAdoptModal(pkt){
     if(key === 'temperature') { unit = '°C'; devClass = 'temperature'; defName = 'Temperatur'; }
     else if(key === 'humidity') { unit = '%'; devClass = 'humidity'; defName = 'Luftfeuchtigkeit'; }
     else if(key === 'battery_low') { unit = ''; devClass = 'battery'; defName = 'Batterie Status'; }
+    else if(key === 'battery_voltage') { unit = 'V'; devClass = 'voltage'; defName = 'Batteriespannung'; }
+    else if(key === 'moisture') { unit = '%'; devClass = 'moisture'; defName = 'Bodenfeuchtigkeit'; }
+    else if(key === 'rain_total' || key === 'rain') { unit = 'mm'; devClass = 'precipitation'; defName = 'Regenmenge'; }
+    else if(key === 'rain_ticks') { unit = ''; devClass = 'sensor'; defName = 'Wippenschläge'; }
+    else if(key === 'adc') { unit = ''; devClass = 'sensor'; defName = 'ADC Wert'; }
     else if(key === 'wind_speed') { unit = 'km/h'; devClass = 'wind_speed'; defName = 'Windgeschwindigkeit'; }
-    else if(key === 'rain') { unit = 'mm'; devClass = 'precipitation'; defName = 'Regenmenge'; }
     else if(key === 'state') { unit = ''; devClass = (pkt.proto==='IT'?'button':'door'); defName = (pkt.proto==='IT'?'Taste / Zustand':'Kontakt Status'); }
     
     let row = document.createElement('div');

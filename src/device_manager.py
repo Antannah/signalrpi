@@ -106,6 +106,24 @@ class DeviceManager:
                         {"key": "battery_low", "name": "Batterie", "device_class": "battery"},
                         {"key": "rssi", "name": "Empfangsstärke", "unit": "dBm", "device_class": "signal_strength", "icon": "mdi:signal"}
                     ]
+                elif profile_name == "rain":
+                    dev["type"] = "sensor"
+                    dev["entities"] = [
+                        {"key": "rain_total", "name": "Regenmenge Gesamt", "unit": "mm", "device_class": "precipitation", "icon": "mdi:weather-rainy"},
+                        {"key": "rain_ticks", "name": "Wippenschläge", "icon": "mdi:counter"},
+                        {"key": "battery_voltage", "name": "Batteriespannung", "unit": "V", "device_class": "voltage"},
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"},
+                        {"key": "rssi", "name": "Empfangsstärke", "unit": "dBm", "device_class": "signal_strength", "icon": "mdi:signal"}
+                    ]
+                elif profile_name == "moisture":
+                    dev["type"] = "sensor"
+                    dev["entities"] = [
+                        {"key": "moisture", "name": "Bodenfeuchtigkeit", "unit": "%", "device_class": "moisture", "icon": "mdi:water-percent"},
+                        {"key": "battery_voltage", "name": "Batteriespannung", "unit": "V", "device_class": "voltage"},
+                        {"key": "battery_low", "name": "Batterie", "device_class": "battery"},
+                        {"key": "adc", "name": "ADC Rohwert", "icon": "mdi:gauge"},
+                        {"key": "rssi", "name": "Empfangsstärke", "unit": "dBm", "device_class": "signal_strength", "icon": "mdi:signal"}
+                    ]
                 elif profile_name == "contact":
                     dev["type"] = "sensor"
                     dev["entities"] = [
@@ -201,9 +219,9 @@ class DeviceManager:
             "via_device": "signalrpi_gateway"
         }
         
-        # Numerische device_class → state_class: measurement (Pflicht ab HA 2023)
+        # Numerische device_class → state_class: measurement oder total_increasing (Pflicht ab HA 2023)
         _MEASUREMENT_CLASSES = {"temperature", "humidity", "signal_strength", "illuminance",
-                                 "pressure", "power", "current", "voltage", "energy"}
+                                 "pressure", "power", "current", "voltage", "energy", "moisture"}
         import time
         if dev_type == "sensor":
             entities = dev.get("entities", [])
@@ -223,8 +241,12 @@ class DeviceManager:
                 dc = ent.get("device_class")
                 if dc:
                     payload["device_class"] = dc
-                    if dc in _MEASUREMENT_CLASSES:
+                    if dc == "precipitation" or key == "rain_total":
+                        payload["state_class"] = "total_increasing"
+                    elif dc in _MEASUREMENT_CLASSES:
                         payload["state_class"] = "measurement"
+                elif key == "rain_total":
+                    payload["state_class"] = "total_increasing"
                 if "icon" in ent:
                     payload["icon"] = ent["icon"]
                     
