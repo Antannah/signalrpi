@@ -229,18 +229,26 @@ class WebServer:
                     data = json.loads(body.decode("utf-8"))
                     if self.tx_handler:
                         res = self.tx_handler(data)
-                        # MQTT-State zurückmelden, damit HA & MQTT Explorer synchron sind
+                        # TX blockiert den Event Loop mehrere 100ms (CYW43 WLAN-Chip
+                        # wird nicht bedient). Kurz yielden damit WLAN-Stack sich erholt.
+                        import uasyncio as asyncio
+                        await asyncio.sleep_ms(150)
+                        # MQTT-State zurückmelden (mit Reconnect-Retry)
                         ha_id = data.get("ha_id")
                         action = data.get("action", "").lower()
                         if res and ha_id and action and self.device_manager.mqtt_client:
                             state_val = "ON" if action in ["on", "true", "1"] else "OFF"
+                            topic = "signalrpi/devices/{}/state".format(ha_id)
                             try:
-                                self.device_manager.mqtt_client.publish(
-                                    "signalrpi/devices/{}/state".format(ha_id),
-                                    state_val, retain=True)
-                                self.device_manager.set_latest(ha_id, {"state": state_val})
+                                self.device_manager.mqtt_client.publish(topic, state_val, retain=True)
                             except Exception:
-                                pass
+                                # Verbindung wiederaufbauen und nochmal versuchen
+                                try:
+                                    self.device_manager.mqtt_client.connect()
+                                    self.device_manager.mqtt_client.publish(topic, state_val, retain=True)
+                                except Exception as me:
+                                    print("MQTT State Fehler nach TX:", me)
+                            self.device_manager.set_latest(ha_id, {"state": state_val})
                         writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
                         writer.write(json.dumps({"ok": True, "result": res}).encode("utf-8"))
                     else:
