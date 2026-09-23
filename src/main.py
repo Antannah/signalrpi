@@ -382,7 +382,9 @@ if has_config:
                     proto_name = decoded["protocol"] if decoded else "RAW_868_FSK"
                     dev_id_str = str(decoded["device_id"]) if decoded else payload[:4].hex().upper()
                     raw_fsk = payload.hex().upper() if not decoded else None
-                    push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, raw_data=raw_fsk)
+                    # Rausch-Pakete (decoded == None und RSSI < -88 dBm) nicht in die Web-Sniffer-Queue schieben
+                    if decoded or rssi > -88.0:
+                        push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, raw_data=raw_fsk)
                     
                     if client:
                         try:
