@@ -62,6 +62,11 @@ class WebServer:
                     writer.write(HTML_PAGE.encode("utf-8"))
                     await writer.drain()
 
+            elif url == "/favicon.ico":
+                fav = b"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='#0f172a'/><path d='M30 68 C30 52 42 40 58 40 M30 80 C30 58 48 40 70 40' stroke='#38bdf8' stroke-width='7' stroke-linecap='round' fill='none'/><path d='M25 55 C25 35 40 20 65 20 M25 42 C25 22 45 10 75 10' stroke='#38bdf8' stroke-width='7' stroke-linecap='round' fill='none' opacity='0.7'/><circle cx='30' cy='75' r='7' fill='#38bdf8'/></svg>"
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: image/svg+xml\r\nConnection: close\r\n\r\n")
+                writer.write(fav)
+
             elif url == "/api/status":
                 gc.collect()
                 ip = self.wlan.ifconfig()[0] if self.wlan.isconnected() else "Offline"
