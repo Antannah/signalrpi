@@ -1336,7 +1336,7 @@ async function sendDeviceSwitch(id, action){
   let dev = (knownDevices || []).find(d => d.id === id);
   if(!dev) return;
   let reps = dev.repetitions || 6;
-  let payload = { action: action, repetitions: reps };
+  let payload = { ha_id: id, action: action, repetitions: reps };
   if(dev.protocol === 'IT_V3'){
     payload.protocol = 'IT_V3';
     payload.binary_code = dev.binary_code || dev.device_id;

@@ -344,8 +344,8 @@ if has_config:
                             if matched_ha_id and is_enabled:
                                 ha_topic = "signalrpi/devices/{}/state".format(matched_ha_id)
                                 dev_obj = device_mgr.get_device(matched_ha_id)
-                                if dev_obj and dev_obj.get("type") == "switch":
-                                    # Home Assistant Switches erwarten "ON" oder "OFF" als Rohstring
+                                if dev_obj and dev_obj.get("type") in ["switch", "light"]:
+                                    # HA Switch/Light erwartet "ON" oder "OFF" als Rohstring
                                     state_str = str(decoded["data"].get("state", "OFF")).upper()
                                     client.publish(ha_topic, state_str, retain=True)
                                 else:
