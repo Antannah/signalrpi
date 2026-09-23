@@ -44,7 +44,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
   <div style="display:flex;align-items:center;gap:8px">
     <div class="pill" id="badge-cc433" style="background:rgba(255,255,255,0.05);color:var(--text-dim)">433 MHz: ...</div>
     <div class="pill" id="badge-cc868" style="background:rgba(255,255,255,0.05);color:var(--text-dim)">868 MHz: ...</div>
-    <div class="pill" id="sys-status">Online</div>
+    <div class="pill" id="sys-status">WLAN</div>
   </div>
 </div>
 <div class="nav">
@@ -341,8 +341,10 @@ function showToast(msg, type='success'){
 function showTab(tabId){
   document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
   document.querySelectorAll('.nav > .nav-btn').forEach(el=>el.classList.remove('active'));
-  document.getElementById(tabId).style.display='block';
-  if(event && event.target) event.target.classList.add('active');
+  let targetTab = document.getElementById(tabId);
+  if(targetTab) targetTab.style.display='block';
+  let targetNavBtn = document.querySelector(`.nav > button[onclick*="'${tabId}'"]`);
+  if(targetNavBtn) targetNavBtn.classList.add('active');
   // Sniffer nur aktiv wenn Tab sichtbar (verhindert stilles Leeren der Queue)
   snifferActive = (tabId === 'tab-sniffer');
 }
@@ -421,8 +423,8 @@ async function refreshDevices(){
               <option value="contact" ${currentProf==='contact'?'selected':''}>🚪 Tür-/Fensterkontakt</option>
               <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>🌡 Temp + Feuchte</option>
               <option value="thermo" ${currentProf==='thermo'?'selected':''}>🌡 Nur Temperatur</option>
-              <option value="rain" ${currentProf==='rain'?'selected':''}>🌧 Regensensor (WH40)</option>
-              <option value="moisture" ${currentProf==='moisture'?'selected':''}>🌱 Bodenfeuchte (WH51)</option>
+              <option value="rain" ${currentProf==='rain'?'selected':''}>🌧 Regensensor</option>
+              <option value="moisture" ${currentProf==='moisture'?'selected':''}>🌱 Bodenfeuchte</option>
             </select>
             <div style="display:flex;gap:6px">
               <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
@@ -610,7 +612,7 @@ async function updateSystem(){
     let cd4 = document.getElementById('cc433-details');
     if(s.cc_433){
       let c4 = s.cc_433;
-      let stText = c4.ok ? '433 MHz: OK (' + c4.state_name + ')' : '433 MHz: FEHLER';
+      let stText = c4.ok ? '433 MHz: OK' : '433 MHz: FEHLER';
       let pillBg = c4.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
       let pillColor = c4.ok ? 'var(--green)' : 'var(--red)';
       if(b4){ b4.innerText = stText; b4.style.background = pillBg; b4.style.color = pillColor; }
@@ -632,7 +634,7 @@ async function updateSystem(){
     let cd8 = document.getElementById('cc868-details');
     if(s.cc_868){
       let c8 = s.cc_868;
-      let stText8 = c8.ok ? '868 MHz: OK (' + c8.state_name + ')' : '868 MHz: FEHLER';
+      let stText8 = c8.ok ? '868 MHz: OK' : '868 MHz: FEHLER';
       let pillBg8 = c8.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
       let pillColor8 = c8.ok ? 'var(--green)' : 'var(--red)';
       if(b8){ b8.innerText = stText8; b8.style.background = pillBg8; b8.style.color = pillColor8; }
@@ -994,19 +996,40 @@ async function executeReassign(){
   showToast('Funk-ID erfolgreich aktualisiert!');
 }
 
-function switchITType(type){
+function switchITSubTab(type){
+  let btnV3 = document.getElementById('it-tab-btn-v3');
+  let btnV1 = document.getElementById('it-tab-btn-v1');
+  let formV3 = document.getElementById('it-form-v3');
+  let formV1 = document.getElementById('it-form-v1');
   if(type === 'v3'){
-    document.getElementById('it-form-v3').style.display = 'block';
-    document.getElementById('it-form-v1').style.display = 'none';
-    document.getElementById('it-type-v3-btn').classList.add('active');
-    document.getElementById('it-type-v1-btn').classList.remove('active');
+    if(formV3) formV3.style.display = 'block';
+    if(formV1) formV1.style.display = 'none';
+    if(btnV3){
+      btnV3.style.background = 'var(--accent)';
+      btnV3.style.color = '#0f172a';
+      btnV3.style.border = 'none';
+    }
+    if(btnV1){
+      btnV1.style.background = 'transparent';
+      btnV1.style.color = 'var(--text-dim)';
+      btnV1.style.border = '1px solid var(--border)';
+    }
   } else {
-    document.getElementById('it-form-v3').style.display = 'none';
-    document.getElementById('it-form-v1').style.display = 'block';
-    document.getElementById('it-type-v1-btn').classList.add('active');
-    document.getElementById('it-type-v3-btn').classList.remove('active');
+    if(formV3) formV3.style.display = 'none';
+    if(formV1) formV1.style.display = 'block';
+    if(btnV1){
+      btnV1.style.background = 'var(--accent)';
+      btnV1.style.color = '#0f172a';
+      btnV1.style.border = 'none';
+    }
+    if(btnV3){
+      btnV3.style.background = 'transparent';
+      btnV3.style.color = 'var(--text-dim)';
+      btnV3.style.border = '1px solid var(--border)';
+    }
   }
 }
+const switchITType = switchITSubTab;
 
 function validateITV3Bits(){
   let input = document.getElementById('it-v3-bin');
@@ -1103,7 +1126,7 @@ async function saveITV3Device(){
     if(res.ok){
       resetITV3Form();
       refreshDevices();
-      showToast('Intertechno V3 Gerät "' + name + '" ' + (editId ? 'aktualisiert' : 'angelegt') + (isEnabled ? ' (MQTT aktiv)' : ''), 'success');
+      showToast('Intertechno V3 Gerät "' + cleanName + '" ' + (editId ? 'aktualisiert' : 'angelegt') + (isEnabled ? ' (MQTT aktiv)' : ''), 'success');
     } else {
       showToast('Fehler beim Speichern (HTTP ' + res.status + ')', 'error');
     }
@@ -1250,7 +1273,7 @@ async function saveITDevice(){
     if(res.ok){
       resetITV1Form();
       refreshDevices();
-      showToast('Intertechno V1 Schalter "' + name + '" ' + (editId ? 'aktualisiert' : 'angelegt') + (isEnabled ? ' (MQTT aktiv)' : ''), 'success');
+      showToast('Intertechno V1 Schalter "' + cleanName + '" ' + (editId ? 'aktualisiert' : 'angelegt') + (isEnabled ? ' (MQTT aktiv)' : ''), 'success');
     } else {
       showToast('Fehler beim Speichern (HTTP ' + res.status + ')', 'error');
     }
