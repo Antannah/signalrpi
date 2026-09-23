@@ -284,6 +284,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
     <label style="font-size:0.8rem;color:var(--text-dim)">Gerätetyp / Funktion:</label>
     <select id="cfg-type-select" class="form-input" style="margin-bottom:12px" onchange="onCfgTypeChange()">
       <option value="switch">🔌 Funk-Schalter</option>
+      <option value="light">💡 Licht / Lampe</option>
       <option value="button">🔘 Fernbedienung / Taster</option>
       <option value="contact">🚪 Tür- / Fensterkontakt</option>
       <option value="thermo_hygro">🌡 Temperatur- & Feuchtesensor</option>
@@ -386,8 +387,8 @@ function renderDeviceCard(d){
     ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">MQTT</span>`
     : '';
 
-  let currentProf = d.profile || (d.type === 'switch' ? 'switch' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo')));
-  let isSwitch = d.type === 'switch';
+  let currentProf = d.profile || (d.type === 'switch' ? 'switch' : (d.type === 'light' ? 'light' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo'))));
+  let isActuator = (d.type === 'switch' || d.type === 'light' || currentProf === 'switch' || currentProf === 'light');
   let infoLine = '';
   if(d.protocol === 'IT_V3' && d.binary_code){
     infoLine = `HA-ID: <code>${d.id}</code> | Code: <b style="font-family:monospace">${d.binary_code}</b> | Ch: <b>${d.channel||1}</b>`;
@@ -419,9 +420,9 @@ function renderDeviceCard(d){
             </div>
           `;
         }).join('')}
-        ${isSwitch ? `
+        ${isActuator ? `
           <div class="val-box">
-            <div class="val-title">Schaltzustand</div>
+            <div class="val-title">${d.type==='light'?'Lichtzustand':'Schaltzustand'}</div>
             <div class="val-num">${(d.latest && d.latest.state) ? d.latest.state : 'OFF'}</div>
           </div>
           <div class="val-box">
@@ -430,19 +431,20 @@ function renderDeviceCard(d){
           </div>
         ` : ''}
       </div>
-      ${isSwitch ? `
+      ${isActuator ? `
         <div style="display:flex;gap:6px;margin:8px 0" onclick="event.stopPropagation()">
           <button class="btn" style="flex:1;background:var(--accent);color:#0f172a" onclick="sendDeviceSwitch('${d.id}','on')">EIN</button>
           <button class="btn" style="flex:1;background:var(--red);color:#fff" onclick="sendDeviceSwitch('${d.id}','off')">AUS</button>
         </div>
       ` : ''}
       <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:10px">
-        ${isSwitch ? 'Letzter Befehl: ' : 'Empfang: '}<b>${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</b>
+        ${isActuator ? 'Letzter Befehl: ' : 'Empfang: '}<b>${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</b>
       </div>
       <!-- Funktionsleiste am unteren Rand -->
       <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)" onclick="event.stopPropagation()">
         <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
           <option value="switch" ${currentProf==='switch'?'selected':''}>🔌 Schalter</option>
+          <option value="light" ${currentProf==='light'?'selected':''}>💡 Licht / Lampe</option>
           <option value="button" ${currentProf==='button'?'selected':''}>🔘 Fernbedienung / Taster</option>
           <option value="contact" ${currentProf==='contact'?'selected':''}>🚪 Tür-/Fensterkontakt</option>
           <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>🌡 Temp + Feuchte</option>
@@ -497,6 +499,7 @@ function renderDevices(){
   // Helper für Profil-Labels
   let profNames = {
     switch: '🔌 Funk-Schalter',
+    light: '💡 Funk-Lichter & Lampen',
     button: '🔘 Fernbedienungen & Taster',
     contact: '🚪 Tür- & Fensterkontakte',
     thermo_hygro: '🌡 Temperatur- & Feuchtesensoren',
@@ -514,7 +517,7 @@ function renderDevices(){
       key = d.protocol || 'Unbekannt';
       title = '📻 Protokoll: ' + key;
     } else if(grpMode === 'profile'){
-      let prof = d.profile || (d.type === 'switch' ? 'switch' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo')));
+      let prof = d.profile || (d.type === 'switch' ? 'switch' : (d.type === 'light' ? 'light' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo'))));
       key = prof;
       title = profNames[prof] || ('Typ: ' + prof);
     } else if(grpMode === 'mqtt'){
@@ -640,7 +643,7 @@ function openEditSensorModal(dev){
   onCfgNameInput();
   let typeSel = document.getElementById('cfg-type-select');
   if(typeSel){
-    typeSel.value = dev.profile || (dev.type === 'switch' ? 'switch' : (dev.protocol === 'IT' ? 'button' : 'sensor'));
+    typeSel.value = dev.profile || (dev.type === 'switch' ? 'switch' : (dev.type === 'light' ? 'light' : (dev.protocol === 'IT' ? 'button' : 'sensor')));
   }
   onCfgTypeChange();
 
@@ -1040,8 +1043,9 @@ async function saveConfiguredDevice(){
   let isEnabled = existingDev ? (existingDev.enabled !== false) : false;
   let selectedType = document.getElementById('cfg-type-select').value;
   
+  let isActuatorType = (selectedType === 'switch' || selectedType === 'light');
   let entities = [];
-  if(selectedType !== 'switch'){
+  if(!isActuatorType){
     document.querySelectorAll('.cfg-ent-row').forEach(row=>{
       let cb = row.querySelector('.ent-enable');
       if(cb && cb.checked){
@@ -1063,15 +1067,15 @@ async function saveConfiguredDevice(){
     protocol: pendingAdoptPacket.proto,
     device_id: pendingAdoptPacket.id,
     channel: pendingAdoptPacket.channel ? parseInt(pendingAdoptPacket.channel) : null,
-    type: (selectedType === 'switch') ? 'switch' : 'sensor',
+    type: isActuatorType ? selectedType : 'sensor',
     profile: selectedType,
     enabled: isEnabled,
     entities: entities
   };
 
-  if(selectedType === 'switch'){
+  if(isActuatorType){
     payload.repetitions = existingDev ? (existingDev.repetitions || 6) : 6;
-    payload.icon = 'mdi:power-socket-de';
+    payload.icon = (selectedType === 'light') ? 'mdi:lightbulb' : 'mdi:power-socket-de';
     if(pendingAdoptPacket.proto === 'IT'){
       let parts = String(pendingAdoptPacket.id).split('_');
       let fam = parts[0] || 'A';

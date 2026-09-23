@@ -193,7 +193,14 @@ class MQTTClient:
     # set by .set_callback() method. Other (internal) MQTT
     # messages processed internally.
     def wait_msg(self):
-        res = self.sock.read(1)
+        try:
+            res = self.sock.read(1)
+        except OSError as e:
+            # 11 = EAGAIN / EWOULDBLOCK (keine Daten im non-blocking Modus)
+            if e.args[0] in [11, 110, 115]:
+                self.sock.setblocking(True)
+                return None
+            raise e
         self.sock.setblocking(True)
         if res is None:
             return None
@@ -229,5 +236,11 @@ class MQTTClient:
     # If not, returns immediately with None. Otherwise, does
     # the same processing as wait_msg.
     def check_msg(self):
-        self.sock.setblocking(False)
-        return self.wait_msg()
+        try:
+            self.sock.setblocking(False)
+            return self.wait_msg()
+        except OSError as e:
+            self.sock.setblocking(True)
+            if e.args[0] in [11, 110, 115]:
+                return None
+            raise e

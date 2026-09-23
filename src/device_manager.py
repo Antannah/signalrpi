@@ -74,11 +74,15 @@ class DeviceManager:
                     self.remove_discovery(ha_id)
                 
                 dev["profile"] = profile_name
-                if profile_name == "switch":
-                    dev["type"] = "switch"
+                if profile_name in ["switch", "light"]:
+                    dev["type"] = profile_name
                     dev["entities"] = []
                     if "repetitions" not in dev:
                         dev["repetitions"] = 6
+                    if profile_name == "light":
+                        dev["icon"] = "mdi:lightbulb"
+                    else:
+                        dev["icon"] = "mdi:power-socket-de"
                     if dev.get("protocol") == "IT" and "it_code" not in dev:
                         dev_id_parts = str(dev.get("device_id", "A_1_1")).split("_")
                         fam = dev_id_parts[0] if len(dev_id_parts) > 0 else "A"
@@ -261,9 +265,10 @@ class DeviceManager:
                     except Exception:
                         pass
                     
-        elif dev_type == "switch":
-            # 1. Switch Entity
-            disc_topic = "homeassistant/switch/signalrpi_{}/config".format(dev_id)
+        elif dev_type in ["switch", "light"]:
+            # 1. Switch oder Light Entity
+            component = "light" if dev_type == "light" else "switch"
+            disc_topic = "homeassistant/{}/signalrpi_{}/config".format(component, dev_id)
             payload = {
                 "name": dev_name,
                 "command_topic": "signalrpi/devices/{}/set".format(dev_id),
@@ -271,13 +276,16 @@ class DeviceManager:
                 "unique_id": "signalrpi_{}".format(dev_id),
                 "device": device_info
             }
+            if dev_type == "light":
+                payload["payload_on"] = "ON"
+                payload["payload_off"] = "OFF"
             if "icon" in dev:
                 payload["icon"] = dev["icon"]
             try:
                 self.mqtt_client.publish(disc_topic, json.dumps(payload).encode('utf-8'), retain=True)
                 time.sleep_ms(25)
             except Exception as e:
-                print("HA Discovery Fehler (Switch):", e)
+                print("HA Discovery Fehler ({}):".format(component), e)
 
             # 2. Number Entity für Repetitions (Wiederholungen)
             rep_topic = "homeassistant/number/signalrpi_{}_rep/config".format(dev_id)
@@ -322,12 +330,18 @@ class DeviceManager:
                 except Exception:
                     pass
         else:
-            disc_topic = "homeassistant/switch/signalrpi_{}/config".format(dev_id)
+            # Sowohl switch als auch light Discovery löschen für sauberen Wechsel
+            for comp in ["switch", "light"]:
+                disc_topic = "homeassistant/{}/signalrpi_{}/config".format(comp, dev_id)
+                try:
+                    self.mqtt_client.publish(disc_topic, "", retain=True)
+                    time.sleep_ms(20)
+                except Exception:
+                    pass
             rep_topic = "homeassistant/number/signalrpi_{}_rep/config".format(dev_id)
             try:
-                self.mqtt_client.publish(disc_topic, "", retain=True)
-                time.sleep_ms(20)
                 self.mqtt_client.publish(rep_topic, "", retain=True)
+                time.sleep_ms(20)
             except Exception:
                 pass
 

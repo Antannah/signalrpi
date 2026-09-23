@@ -218,7 +218,7 @@ if has_config:
                     parts = t_str.split("/")
                     ha_id = parts[2]
                     dev = device_mgr.get_device(ha_id)
-                    if dev and dev.get("type") == "switch":
+                    if dev and dev.get("type") in ["switch", "light"]:
                         reps = dev.get("repetitions", 6)
                         proto = dev.get("protocol", "IT_V3")
                         state_val = m_str.upper()
@@ -236,8 +236,9 @@ if has_config:
                             tx_cmd["group"] = it_c.get("group", 1)
                             tx_cmd["device"] = it_c.get("device", 1)
                             
+                        print("MQTT Befehl für {}: {} ({})".format(ha_id, tx_cmd["action"], proto))
                         if handle_tx(tx_cmd):
-                            # Schalter-Status an Home Assistant zurückmelden
+                            # Schalter-/Licht-Status an Home Assistant zurückmelden
                             client.publish("signalrpi/devices/{}/state".format(ha_id), state_val, retain=True)
                             device_mgr.set_latest(ha_id, {"state": state_val})
                             
