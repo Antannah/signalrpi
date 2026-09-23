@@ -56,10 +56,28 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 
 <div id="tab-devices" class="tab-content">
   <div class="card">
-    <div style="margin-bottom:1rem">
-      <h3>Bekannte Funk-Geräte</h3>
+    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:1.25rem">
+      <div>
+        <h3 style="margin-bottom:2px">Bekannte Funk-Geräte</h3>
+        <p style="color:var(--text-dim);font-size:0.8rem">Übersicht aller im Gateway gespeicherten Sensoren und Aktoren.</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <label style="font-size:0.8rem;color:var(--text-dim)">Gruppierung:</label>
+        <select id="device-grouping-select" class="form-input" style="width:auto;margin:0;padding:5px 8px;font-size:0.8rem" onchange="renderDevices()">
+          <option value="none">Keine (Kompakt)</option>
+          <option value="protocol">Nach Funk-Protokoll</option>
+          <option value="profile">Nach Geräte-Typ</option>
+          <option value="mqtt">Nach MQTT-Status</option>
+        </select>
+        <label style="font-size:0.8rem;color:var(--text-dim);margin-left:4px">Filter:</label>
+        <select id="device-filter-mqtt" class="form-input" style="width:auto;margin:0;padding:5px 8px;font-size:0.8rem" onchange="renderDevices()">
+          <option value="all">Alle Geräte</option>
+          <option value="mqtt_only">Nur mit MQTT</option>
+          <option value="no_mqtt">Nur ohne MQTT</option>
+        </select>
+      </div>
     </div>
-    <div id="devices-list" class="grid">Lade Geräte...</div>
+    <div id="devices-list">Lade Geräte...</div>
   </div>
 </div>
 
@@ -353,90 +371,176 @@ async function refreshDevices(){
   try{
     let res = await fetch('/api/devices');
     knownDevices = await res.json();
-    let c = document.getElementById('devices-list');
-    if(!knownDevices.length){c.innerHTML='<p style="color:var(--text-dim)">Keine Geräte angelegt.</p>';return;}
-    c.innerHTML = knownDevices.map(d=>{
-      let isEn = d.enabled !== false;
-      // MQTT-Badge wird oben NUR angezeigt, wenn MQTT aktiv ist (transparentes Grün)
-      let mqttBadge = isEn 
-        ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">MQTT</span>`
-        : '';
-
-      let currentProf = d.profile || (d.type === 'switch' ? 'switch' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo')));
-      let isSwitch = d.type === 'switch';
-      let infoLine = '';
-      if(d.protocol === 'IT_V3' && d.binary_code){
-        infoLine = `HA-ID: <code>${d.id}</code> | Code: <b style="font-family:monospace">${d.binary_code}</b> | Ch: <b>${d.channel||1}</b>`;
-      } else if(d.protocol === 'IT' && d.it_code){
-        infoLine = `HA-ID: <code>${d.id}</code> | Hauscode: <b>${d.it_code.family}</b> | Gruppe: <b>${d.it_code.group}</b> | Kanal: <b>${d.it_code.device}</b>`;
-      } else {
-        infoLine = `HA-ID: <code>${d.id}</code> | Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}`;
-      }
-
-      return `
-        <div class="device-card" style="cursor:pointer;transition:border-color 0.2s" onclick="editDevice('${d.id}')" title="Klicken zum Bearbeiten">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <strong style="font-size:1.05rem">${d.name} <span style="font-size:0.8rem;color:var(--text-dim);font-weight:normal">✏</span></strong>
-            <div style="display:flex;gap:6px;align-items:center">
-              ${mqttBadge}
-              <span style="font-size:0.75rem;color:var(--accent);font-weight:600">${d.protocol}</span>
-            </div>
-          </div>
-          <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">
-            ${infoLine}
-          </div>
-          <div class="val-grid">
-            ${(d.entities||[]).filter(e => e.key !== 'channel' && e.key !== 'forced_send').map(e=>{
-              let val = (d.latest && d.latest[e.key] !== undefined) ? d.latest[e.key] : (d.last_values ? d.last_values[e.key] : null);
-              return `
-                <div class="val-box">
-                  <div class="val-title">${e.name}</div>
-                  <div class="val-num">${val!==null && val!==undefined ? val+(e.unit?' '+e.unit:'') : '--'}</div>
-                </div>
-              `;
-            }).join('')}
-            ${isSwitch ? `
-              <div class="val-box">
-                <div class="val-title">Schaltzustand</div>
-                <div class="val-num">${(d.latest && d.latest.state) ? d.latest.state : 'OFF'}</div>
-              </div>
-              <div class="val-box">
-                <div class="val-title">Wdh (Reps)</div>
-                <div class="val-num">${d.repetitions || 6}</div>
-              </div>
-            ` : ''}
-          </div>
-          ${isSwitch ? `
-            <div style="display:flex;gap:6px;margin:8px 0" onclick="event.stopPropagation()">
-              <button class="btn" style="flex:1;background:var(--accent);color:#0f172a" onclick="sendDeviceSwitch('${d.id}','on')">EIN</button>
-              <button class="btn" style="flex:1;background:var(--red);color:#fff" onclick="sendDeviceSwitch('${d.id}','off')">AUS</button>
-            </div>
-          ` : ''}
-          <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:10px">
-            ${isSwitch ? 'Letzter Befehl: ' : 'Empfang: '}<b>${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</b>
-          </div>
-          <!-- Funktionsleiste am unteren Rand -->
-          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)" onclick="event.stopPropagation()">
-            <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
-              <option value="switch" ${currentProf==='switch'?'selected':''}>🔌 Schalter (Aktor / Steckdose)</option>
-              <option value="button" ${currentProf==='button'?'selected':''}>🔘 Fernbedienung / Taster</option>
-              <option value="contact" ${currentProf==='contact'?'selected':''}>🚪 Tür-/Fensterkontakt</option>
-              <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>🌡 Temp + Feuchte</option>
-              <option value="thermo" ${currentProf==='thermo'?'selected':''}>🌡 Nur Temperatur</option>
-              <option value="rain" ${currentProf==='rain'?'selected':''}>🌧 Regensensor</option>
-              <option value="moisture" ${currentProf==='moisture'?'selected':''}>🌱 Bodenfeuchte</option>
-            </select>
-            <div style="display:flex;gap:6px">
-              <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
-                ${isEn ? '📡 MQTT deregistrieren' : '📡 MQTT registrieren'}
-              </button>
-              <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">🗑 Löschen</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
+    renderDevices();
   }catch(e){}
+}
+
+function renderDeviceCard(d){
+  let isEn = d.enabled !== false;
+  let mqttBadge = isEn 
+    ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">MQTT</span>`
+    : '';
+
+  let currentProf = d.profile || (d.type === 'switch' ? 'switch' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo')));
+  let isSwitch = d.type === 'switch';
+  let infoLine = '';
+  if(d.protocol === 'IT_V3' && d.binary_code){
+    infoLine = `HA-ID: <code>${d.id}</code> | Code: <b style="font-family:monospace">${d.binary_code}</b> | Ch: <b>${d.channel||1}</b>`;
+  } else if(d.protocol === 'IT' && d.it_code){
+    infoLine = `HA-ID: <code>${d.id}</code> | Hauscode: <b>${d.it_code.family}</b> | Gruppe: <b>${d.it_code.group}</b> | Kanal: <b>${d.it_code.device}</b>`;
+  } else {
+    infoLine = `HA-ID: <code>${d.id}</code> | Funk-ID: <b>${d.device_id||'Auto'}</b> ${d.channel?'| Kanal: '+d.channel:''}`;
+  }
+
+  return `
+    <div class="device-card" style="cursor:pointer;transition:border-color 0.2s" onclick="editDevice('${d.id}')" title="Klicken zum Bearbeiten">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong style="font-size:1.05rem">${d.name} <span style="font-size:0.8rem;color:var(--text-dim);font-weight:normal">✏</span></strong>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${mqttBadge}
+          <span style="font-size:0.75rem;color:var(--accent);font-weight:600">${d.protocol}</span>
+        </div>
+      </div>
+      <div style="font-size:0.8rem;color:var(--text-dim);margin:6px 0">
+        ${infoLine}
+      </div>
+      <div class="val-grid">
+        ${(d.entities||[]).filter(e => e.key !== 'channel' && e.key !== 'forced_send').map(e=>{
+          let val = (d.latest && d.latest[e.key] !== undefined) ? d.latest[e.key] : (d.last_values ? d.last_values[e.key] : null);
+          return `
+            <div class="val-box">
+              <div class="val-title">${e.name}</div>
+              <div class="val-num">${val!==null && val!==undefined ? val+(e.unit?' '+e.unit:'') : '--'}</div>
+            </div>
+          `;
+        }).join('')}
+        ${isSwitch ? `
+          <div class="val-box">
+            <div class="val-title">Schaltzustand</div>
+            <div class="val-num">${(d.latest && d.latest.state) ? d.latest.state : 'OFF'}</div>
+          </div>
+          <div class="val-box">
+            <div class="val-title">Wdh (Reps)</div>
+            <div class="val-num">${d.repetitions || 6}</div>
+          </div>
+        ` : ''}
+      </div>
+      ${isSwitch ? `
+        <div style="display:flex;gap:6px;margin:8px 0" onclick="event.stopPropagation()">
+          <button class="btn" style="flex:1;background:var(--accent);color:#0f172a" onclick="sendDeviceSwitch('${d.id}','on')">EIN</button>
+          <button class="btn" style="flex:1;background:var(--red);color:#fff" onclick="sendDeviceSwitch('${d.id}','off')">AUS</button>
+        </div>
+      ` : ''}
+      <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:10px">
+        ${isSwitch ? 'Letzter Befehl: ' : 'Empfang: '}<b>${(d.latest && d.latest._time) ? d.latest._time : (d.last_seen ? new Date(d.last_seen*1000).toLocaleTimeString() : 'Warte auf Signal...')}</b>
+      </div>
+      <!-- Funktionsleiste am unteren Rand -->
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)" onclick="event.stopPropagation()">
+        <select class="form-input" style="width:auto;margin:0;padding:4px 6px;font-size:0.75rem" onchange="changeDeviceProfile('${d.id}', this.value)">
+          <option value="switch" ${currentProf==='switch'?'selected':''}>🔌 Schalter (Aktor / Steckdose)</option>
+          <option value="button" ${currentProf==='button'?'selected':''}>🔘 Fernbedienung / Taster</option>
+          <option value="contact" ${currentProf==='contact'?'selected':''}>🚪 Tür-/Fensterkontakt</option>
+          <option value="thermo_hygro" ${currentProf==='thermo_hygro'?'selected':''}>🌡 Temp + Feuchte</option>
+          <option value="thermo" ${currentProf==='thermo'?'selected':''}>🌡 Nur Temperatur</option>
+          <option value="rain" ${currentProf==='rain'?'selected':''}>🌧 Regensensor</option>
+          <option value="moisture" ${currentProf==='moisture'?'selected':''}>🌱 Bodenfeuchte</option>
+        </select>
+        <div style="display:flex;gap:6px">
+          <button class="btn ${isEn ? 'btn-amber' : ''}" style="padding:4px 10px;font-size:0.75rem" onclick="toggleDevice('${d.id}')">
+            ${isEn ? '📡 MQTT deregistrieren' : '📡 MQTT registrieren'}
+          </button>
+          <button class="btn btn-del" style="padding:4px 8px;font-size:0.75rem" onclick="deleteDevice('${d.id}')">🗑 Löschen</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDevices(){
+  let c = document.getElementById('devices-list');
+  if(!c) return;
+  if(!knownDevices || !knownDevices.length){
+    c.innerHTML = '<p style="color:var(--text-dim)">Keine Geräte angelegt.</p>';
+    return;
+  }
+
+  // 1. Filter anwenden
+  let filterMqtt = document.getElementById('device-filter-mqtt') ? document.getElementById('device-filter-mqtt').value : 'all';
+  let filtered = knownDevices.filter(d => {
+    let isEn = d.enabled !== false;
+    if(filterMqtt === 'mqtt_only') return isEn;
+    if(filterMqtt === 'no_mqtt') return !isEn;
+    return true;
+  });
+
+  if(!filtered.length){
+    c.innerHTML = '<p style="color:var(--text-dim)">Keine Geräte entsprechen dem gewählten Filter.</p>';
+    return;
+  }
+
+  // 2. Alphabetisch nach Name sortieren (A..Z)
+  filtered.sort((a, b) => (a.name || a.id || '').localeCompare(b.name || b.id || '', undefined, {sensitivity: 'base', numeric: true}));
+
+  // 3. Gruppierung ermitteln
+  let grpMode = document.getElementById('device-grouping-select') ? document.getElementById('device-grouping-select').value : 'none';
+
+  if(grpMode === 'none'){
+    c.innerHTML = `<div class="grid">${filtered.map(renderDeviceCard).join('')}</div>`;
+    return;
+  }
+
+  // Helper für Profil-Labels
+  let profNames = {
+    switch: '🔌 Funk-Schalter (Aktoren & Steckdosen)',
+    button: '🔘 Fernbedienungen & Taster',
+    contact: '🚪 Tür- & Fensterkontakte',
+    thermo_hygro: '🌡 Temperatur- & Feuchtesensoren',
+    thermo: '🌡 Temperatur-Sensoren',
+    rain: '🌧 Regensensoren (WH40)',
+    moisture: '🌱 Bodenfeuchte-Sensoren (WH51 / XT300)',
+    sensor: '📊 Allgemeine Sensoren'
+  };
+
+  let groups = {};
+  filtered.forEach(d => {
+    let key = '';
+    let title = '';
+    if(grpMode === 'protocol'){
+      key = d.protocol || 'Unbekannt';
+      title = '📻 Protokoll: ' + key;
+    } else if(grpMode === 'profile'){
+      let prof = d.profile || (d.type === 'switch' ? 'switch' : (d.entities && d.entities.length > 2 ? 'thermo_hygro' : (d.entities && d.entities.some(e=>e.key==='state') ? (d.protocol==='IT'?'button':'contact') : 'thermo')));
+      key = prof;
+      title = profNames[prof] || ('Typ: ' + prof);
+    } else if(grpMode === 'mqtt'){
+      let isEn = d.enabled !== false;
+      key = isEn ? 'mqtt_active' : 'mqtt_inactive';
+      title = isEn ? '📡 Home Assistant MQTT aktiv' : '💤 Lokal / Ohne MQTT';
+    }
+    if(!groups[key]) groups[key] = {title: title, list: []};
+    groups[key].list.push(d);
+  });
+
+  let groupKeys = Object.keys(groups).sort();
+  // Bei MQTT bevorzugt 'mqtt_active' zuerst anzeigen
+  if(grpMode === 'mqtt'){
+    groupKeys.sort((a,b) => (a === 'mqtt_active' ? -1 : 1));
+  }
+
+  c.innerHTML = groupKeys.map(k => {
+    let grp = groups[k];
+    return `
+      <div style="margin-bottom:1.5rem">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.08)">
+          <h4 style="color:var(--accent);font-size:0.95rem;margin:0">${grp.title}</h4>
+          <span style="font-size:0.75rem;background:rgba(255,255,255,0.08);padding:1px 7px;border-radius:10px;color:var(--text-dim)">${grp.list.length}</span>
+        </div>
+        <div class="grid">
+          ${grp.list.map(renderDeviceCard).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function editDevice(id){
@@ -968,7 +1072,7 @@ async function saveConfiguredDevice(){
   
   closeConfigModal();
   refreshDevices();
-  showToast('Gerät "' + name + '" erfolgreich ' + (editId ? 'aktualisiert' : 'angelegt') + (isEnabled ? ' (MQTT aktiv)' : ''));
+  showToast('Gerät "' + cleanName + '" erfolgreich ' + (editId ? 'aktualisiert' : 'angelegt') + (isEnabled ? ' (MQTT aktiv)' : ''));
 }
 
 function openReassign(proto, id, ch){
@@ -997,39 +1101,45 @@ async function executeReassign(){
 }
 
 function switchITSubTab(type){
-  let btnV3 = document.getElementById('it-tab-btn-v3');
-  let btnV1 = document.getElementById('it-tab-btn-v1');
-  let formV3 = document.getElementById('it-form-v3');
-  let formV1 = document.getElementById('it-form-v1');
-  if(type === 'v3'){
-    if(formV3) formV3.style.display = 'block';
-    if(formV1) formV1.style.display = 'none';
-    if(btnV3){
-      btnV3.style.background = 'var(--accent)';
-      btnV3.style.color = '#0f172a';
-      btnV3.style.border = 'none';
+  try {
+    let btnV3 = document.getElementById('it-tab-btn-v3');
+    let btnV1 = document.getElementById('it-tab-btn-v1');
+    let formV3 = document.getElementById('it-form-v3');
+    let formV1 = document.getElementById('it-form-v1');
+    if(!formV3 || !formV1) return;
+    if(type === 'v3'){
+      formV3.style.display = 'block';
+      formV1.style.display = 'none';
+      if(btnV3){
+        btnV3.style.background = 'var(--accent)';
+        btnV3.style.color = '#0f172a';
+        btnV3.style.border = 'none';
+      }
+      if(btnV1){
+        btnV1.style.background = 'transparent';
+        btnV1.style.color = 'var(--text-dim)';
+        btnV1.style.border = '1px solid var(--border)';
+      }
+    } else {
+      formV3.style.display = 'none';
+      formV1.style.display = 'block';
+      if(btnV1){
+        btnV1.style.background = 'var(--accent)';
+        btnV1.style.color = '#0f172a';
+        btnV1.style.border = 'none';
+      }
+      if(btnV3){
+        btnV3.style.background = 'transparent';
+        btnV3.style.color = 'var(--text-dim)';
+        btnV3.style.border = '1px solid var(--border)';
+      }
     }
-    if(btnV1){
-      btnV1.style.background = 'transparent';
-      btnV1.style.color = 'var(--text-dim)';
-      btnV1.style.border = '1px solid var(--border)';
-    }
-  } else {
-    if(formV3) formV3.style.display = 'none';
-    if(formV1) formV1.style.display = 'block';
-    if(btnV1){
-      btnV1.style.background = 'var(--accent)';
-      btnV1.style.color = '#0f172a';
-      btnV1.style.border = 'none';
-    }
-    if(btnV3){
-      btnV3.style.background = 'transparent';
-      btnV3.style.color = 'var(--text-dim)';
-      btnV3.style.border = '1px solid var(--border)';
-    }
+  } catch(e) {
+    console.error('switchITSubTab error:', e);
   }
 }
-const switchITType = switchITSubTab;
+window.switchITSubTab = switchITSubTab;
+window.switchITType = switchITSubTab;
 
 function validateITV3Bits(){
   let input = document.getElementById('it-v3-bin');
