@@ -230,9 +230,9 @@ class WebServer:
                     if self.tx_handler:
                         res = self.tx_handler(data)
                         # TX blockiert den Event Loop mehrere 100ms (CYW43 WLAN-Chip
-                        # wird nicht bedient). Kurz yielden damit WLAN-Stack sich erholt.
-                        import uasyncio as asyncio
-                        await asyncio.sleep_ms(150)
+                        # wird nicht bedient). Kurze Pause damit WLAN-Stack sich erholt.
+                        import time as _time
+                        _time.sleep_ms(200)
                         # MQTT-State zurückmelden (mit Reconnect-Retry)
                         ha_id = data.get("ha_id")
                         action = data.get("action", "").lower()
@@ -242,7 +242,6 @@ class WebServer:
                             try:
                                 self.device_manager.mqtt_client.publish(topic, state_val, retain=True)
                             except Exception:
-                                # Verbindung wiederaufbauen und nochmal versuchen
                                 try:
                                     self.device_manager.mqtt_client.connect()
                                     self.device_manager.mqtt_client.publish(topic, state_val, retain=True)
