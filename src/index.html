@@ -1592,6 +1592,8 @@ async function triggerGitHubOTA(){
 
   // Stoppe alle Hintergrund-Abfragen im Webinterface, damit der Pico während des TLS-Downloads 100% freien RAM hat
   snifferActive = false;
+  if(window._sysPollInterval) clearInterval(window._sysPollInterval);
+  if(window._devPollInterval) clearInterval(window._devPollInterval);
 
   try{
     let res = await fetch('/api/ota', {
@@ -1771,8 +1773,8 @@ updateSystem();
 loadTimeSettings();
 loadSettings();
 startSniffer();
-setInterval(updateSystem, 8000);
-setInterval(refreshDevices, 5000);
+window._sysPollInterval = setInterval(updateSystem, 8000);
+window._devPollInterval = setInterval(refreshDevices, 5000);
 </script>
 </body>
 </html>
