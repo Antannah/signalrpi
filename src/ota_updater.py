@@ -27,7 +27,7 @@ FILES_TO_UPDATE = [
     "src/en_decoders/sd_ws_fsk.py"
 ]
 
-VERSION = "1.0.0-alpha"
+VERSION = "1.1.0-alpha"
 
 def get_version_info():
     """

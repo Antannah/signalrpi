@@ -785,7 +785,7 @@ async function updateSystem(){
     document.getElementById('s-ram').innerText = Math.round(s.free_ram/1024)+' kB';
 
     // 0. Version & Branch Anzeige
-    let curVer = s.version || '1.0.0-alpha';
+    let curVer = s.version || '1.1.0-alpha';
     let curBranch = s.branch || 'main';
     let bBranch = document.getElementById('badge-branch');
     if(bBranch){
