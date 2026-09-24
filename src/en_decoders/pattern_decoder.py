@@ -87,11 +87,14 @@ class PatternDecoder:
         signed_pulses = []
         raw_clean = []
         for i, p in enumerate(pulses):
-            val = int(p)
-            if abs(val) < 40:
-                continue  # Glitch-Filterung
+            try:
+                val = int(p)
+            except Exception:
+                continue
+            if val < 40 or val > 65000:
+                continue  # Glitch-Filterung & Ausreißer
             raw_clean.append(val)
-            signed_val = val if (i % 2 == 0) else -val
+            signed_val = val if (len(raw_clean) % 2 == 1) else -val
             signed_pulses.append(signed_val)
 
         if len(signed_pulses) < 8:

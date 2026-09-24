@@ -303,7 +303,7 @@ if has_config:
     # Puffer für Live-Sniffer im Webinterface (max 30 Pakete)
     sniffer_queue = []
 
-    def push_sniffer(band, proto, dev_id, rssi, data=None, channel=None, matched_name=None, raw_data=None):
+    def push_sniffer(band, proto, dev_id, rssi, data=None, channel=None, matched_name=None, raw_data=None, ms_pattern=None):
         if len(sniffer_queue) > 30:
             sniffer_queue.pop(0)
         t = time.localtime()
@@ -317,7 +317,8 @@ if has_config:
             "rssi": round(rssi, 1),
             "data": data or {},
             "device_name": matched_name,
-            "raw": raw_data
+            "raw": raw_data,
+            "ms": ms_pattern
         })
 
     # 8. Asynchroner Webserver starten
@@ -382,12 +383,21 @@ if has_config:
                 proto_name = decoded["protocol"] if decoded else "RAW_433"
                 dev_id_str = str(decoded["device_id"]) if decoded else "-"
                 ch = decoded.get("data", {}).get("channel") if decoded else None
+                ms_str = decoded.get("ms_string") if decoded else None
+                if not ms_str:
+                    try:
+                        pat = decoders.PatternDecoder.decode_pattern(packet_433)
+                        if pat:
+                            ms_str = pat.to_ms_string()
+                    except Exception:
+                        pass
+
                 # Debug: 433 MHz Pakete auf der seriellen Konsole ausgeben
-                print("[433 OOK] proto={} id={} ch={} rssi={:.1f}dBm decoded={}".format(
-                    proto_name, dev_id_str, ch, rssi, decoded is not None))
+                print("[433 OOK] proto={} id={} ch={} rssi={:.1f}dBm decoded={} ms={}".format(
+                    proto_name, dev_id_str, ch, rssi, decoded is not None, ms_str or "-"))
                 # Bei unbekannten Signalen Rohpulse (max. 120 Flanken) für Web-UI mitsenden
                 raw_to_send = packet_433[:120] if not decoded else None
-                push_sniffer("433 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, channel=ch, matched_name=matched_name, raw_data=raw_to_send)
+                push_sniffer("433 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, channel=ch, matched_name=matched_name, raw_data=raw_to_send, ms_pattern=ms_str)
                 
                 if client:
                     try:
