@@ -15,24 +15,11 @@ class DecoderTCM97001(BaseDecoder):
 
     def decode(self, signal) -> dict | None:
         pattern = None
-        raw_pulses = None
 
         if isinstance(signal, SignalPattern):
             pattern = signal
-            raw_pulses = signal.raw_pulses
         elif isinstance(signal, list):
-            raw_pulses = signal
-            # 1. Schnelle direkte Zeitschwellen-Logik (original cul_tcm97001, null Overhead/RAM)
-            res = self._decode_raw(raw_pulses)
-            if res:
-                return res
             pattern = PatternDecoder.decode_pattern(signal)
-
-        # 2. Falls SignalPattern vorliegt oder Rohanalyse fehlschlug
-        if raw_pulses:
-            res = self._decode_raw(raw_pulses)
-            if res:
-                return res
 
         if pattern and 350 <= pattern.clock <= 650:
             return self._decode_pattern(pattern)
@@ -74,37 +61,6 @@ class DecoderTCM97001(BaseDecoder):
             return None
 
         return self._parse_bits(bits[:36], pattern.clock)
-
-    def _decode_raw(self, pulses: list) -> dict | None:
-        """
-        Originale CUL_TCM97001 Zeitschwellen-Logik mit Schiebefenster.
-        """
-        bits = []
-        i = 0
-        while i < len(pulses) - 1:
-            high = pulses[i]
-            low = pulses[i+1]
-
-            if 250 <= high <= 850:
-                if 1400 <= low <= 2800:
-                    bits.append(0)
-                    i += 2
-                    continue
-                elif 3000 <= low <= 5200:
-                    bits.append(1)
-                    i += 2
-                    continue
-
-            if len(bits) < 36:
-                bits = []
-            elif len(bits) >= 36:
-                break
-            i += 1
-
-        if len(bits) < 36:
-            return None
-
-        return self._parse_bits(bits[:36])
 
     def _parse_bits(self, bits: list[int], clock: int | None = None) -> dict | None:
         """
