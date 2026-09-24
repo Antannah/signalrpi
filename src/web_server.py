@@ -329,6 +329,12 @@ class WebServer:
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
                 writer.write(json.dumps(pkts).encode("utf-8"))
 
+            elif url == "/api/ota/status":
+                import ota_updater
+                st = ota_updater.get_ota_state()
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
+                writer.write(json.dumps(st).encode("utf-8"))
+
             elif url == "/api/ota" and method == "POST":
                 # GitHub OTA Update anstoßen (optional mit Branch-Angabe im Body)
                 body = await reader.read(content_len) if content_len > 0 else b"{}"
@@ -343,11 +349,18 @@ class WebServer:
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"status\":\"started\",\"branch\":\"" + branch.encode("utf-8") + b"\"}")
                 await writer.drain()
                 await writer.aclose()
-                try:
-                    import ota_updater
-                    ota_updater.update_from_github(branch=branch)
-                except Exception as ex:
-                    print("OTA Trigger Fehler:", ex)
+
+                # Starte OTA entkoppelt als asynchronen Hintergrund-Task, um TCP-Verbindung sofort freizugeben
+                async def run_ota_task(target_branch):
+                    import asyncio, ota_updater, gc
+                    await asyncio.sleep_ms(200)
+                    gc.collect()
+                    try:
+                        ota_updater.update_from_github(branch=target_branch)
+                    except Exception as ex:
+                        print("OTA Task Fehler:", ex)
+
+                asyncio.create_task(run_ota_task(branch))
                 return
 
             elif url == "/api/restart" and method == "POST":

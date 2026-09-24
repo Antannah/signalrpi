@@ -285,6 +285,11 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
           </select>
         </div>
         <button class="btn" onclick="triggerGitHubOTA()" id="btn-ota" style="width:100%">🚀 Update starten</button>
+        <div id="ota-progress-box" style="display:none;margin-top:10px">
+          <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden">
+            <div id="ota-progress-bar" style="width:0%;height:100%;background:var(--accent);transition:width 0.3s"></div>
+          </div>
+        </div>
         <div id="ota-status" style="font-size:0.8rem;margin-top:8px;color:var(--amber)"></div>
       </div>
 
@@ -1557,18 +1562,55 @@ async function triggerGitHubOTA(){
   if(!confirm('GitHub OTA Update von Branch "' + branch + '" jetzt starten? Der Pico lädt die Dateien herunter und startet neu.')) return;
   let btn = document.getElementById('btn-ota');
   let st = document.getElementById('ota-status');
+  let pBox = document.getElementById('ota-progress-box');
+  let pBar = document.getElementById('ota-progress-bar');
+
   btn.disabled = true;
-  st.innerText = 'OTA Download von "' + branch + '" läuft... Bitte ca. 15 Sekunden warten.';
+  if(pBox) pBox.style.display = 'block';
+  if(pBar) pBar.style.width = '5%';
+  st.innerText = 'Starte OTA Update für "' + branch + '"...';
+
   try{
-    await fetch('/api/ota', {
+    let res = await fetch('/api/ota', {
       method:'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({branch: branch})
     });
-    st.innerText = 'Pico startet neu... Verbinde in 6s neu...';
-    setTimeout(()=>{ location.reload(); }, 6500);
+    if(!res.ok){
+      st.innerText = 'Fehler beim Starten des Updates (HTTP ' + res.status + ')';
+      btn.disabled = false;
+      return;
+    }
+
+    // Polle den Fortschritt über /api/ota/status
+    let pollInterval = setInterval(async ()=>{
+      try{
+        let r = await fetch('/api/ota/status');
+        if(r.ok){
+          let data = await r.json();
+          if(data.status === 'downloading'){
+            let pct = Math.max(10, Math.round((data.step / (data.total || 1)) * 90));
+            if(pBar) pBar.style.width = pct + '%';
+            st.innerText = data.message || ('Lade ' + data.current_file + '...');
+          } else if(data.status === 'rebooting'){
+            clearInterval(pollInterval);
+            if(pBar) { pBar.style.width = '100%'; pBar.style.background = 'var(--green)'; }
+            st.innerText = data.message || 'Update fertig! Pico startet neu... Verbinde in 7s...';
+            setTimeout(()=>{ location.reload(); }, 7500);
+          } else if(data.status === 'error'){
+            clearInterval(pollInterval);
+            if(pBar) { pBar.style.background = 'var(--red)'; }
+            st.innerText = data.message || 'Fehler beim Download!';
+            btn.disabled = false;
+          }
+        }
+      }catch(err){
+        // Netzwerkunterbrechung während des Neustarts ist normal
+      }
+    }, 1200);
+
   }catch(e){
-    st.innerText = 'Fehler beim Auslösen des OTA Updates.';
+    st.innerText = 'Fehler beim Auslösen des OTA Updates: ' + e;
     btn.disabled = false;
   }
 }
