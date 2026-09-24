@@ -325,13 +325,22 @@ class WebServer:
                 writer.write(json.dumps(pkts).encode("utf-8"))
 
             elif url == "/api/ota" and method == "POST":
-                # GitHub OTA Update anstoßen
-                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"status\":\"started\"}")
+                # GitHub OTA Update anstoßen (optional mit Branch-Angabe im Body)
+                body = await reader.read(content_len) if content_len > 0 else b"{}"
+                branch = "main"
+                try:
+                    data = json.loads(body.decode("utf-8")) if body else {}
+                    if isinstance(data, dict) and data.get("branch"):
+                        branch = str(data["branch"]).strip()
+                except Exception:
+                    pass
+
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"status\":\"started\",\"branch\":\"" + branch.encode("utf-8") + b"\"}")
                 await writer.drain()
                 await writer.aclose()
                 try:
                     import ota_updater
-                    ota_updater.update_from_github()
+                    ota_updater.update_from_github(branch=branch)
                 except Exception as ex:
                     print("OTA Trigger Fehler:", ex)
                 return

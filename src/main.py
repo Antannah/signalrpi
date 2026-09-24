@@ -190,9 +190,16 @@ if has_config:
             print("[MQTT IN] Topic:", t_str, "Payload:", m_str)
             
             if t_str == "signalrpi/system/ota_update":
-                print("MQTT OTA Update Befehl empfangen!")
+                branch = m_str if m_str and not m_str.startswith("{") else "main"
+                if m_str.startswith("{"):
+                    try:
+                        b_data = json.loads(m_str)
+                        branch = b_data.get("branch", "main")
+                    except Exception:
+                        pass
+                print("MQTT OTA Update Befehl empfangen für Branch:", branch)
                 import ota_updater
-                ota_updater.update_from_github()
+                ota_updater.update_from_github(branch=branch)
                 
             elif t_str.startswith("signalrpi/devices/") and t_str.endswith("/set"):
                 # Format: signalrpi/devices/<ha_id>/set
@@ -409,10 +416,20 @@ if has_config:
                                     state_data["rssi"] = round(rssi, 1)
                                     client.publish(ha_topic, json.dumps(state_data))
                         else:
-                            client.publish("signalrpi/raw/433", json.dumps({
+                            ms_str = None
+                            try:
+                                pat = decoders.PatternDecoder.decode_pattern(packet_433)
+                                if pat:
+                                    ms_str = pat.to_ms_string()
+                            except Exception:
+                                pass
+                            raw_payload = {
                                 "rssi": rssi,
                                 "pulses": packet_433
-                            }))
+                            }
+                            if ms_str:
+                                raw_payload["ms"] = ms_str
+                            client.publish("signalrpi/raw/433", json.dumps(raw_payload))
                     except Exception as ex:
                         print("[MQTT] Sende-Fehler 433 MHz:", ex)
                         client = None

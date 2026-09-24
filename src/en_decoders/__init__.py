@@ -12,6 +12,8 @@ from .it_encoder import ITEncoder
 DECODERS_OOK = [
     DecoderIntertechno(),
     DecoderTCM97001(),
+    DecoderWS07(),
+    DecoderWSOOK(),
 ]
 
 # FSK-Decoder (Byte-Pakete)
@@ -42,6 +44,8 @@ def decode_ook_signal(pulse_width_sequence: list) -> dict | None:
                 result = decoder.decode(pulse_width_sequence)
                 
             if result:
+                if pattern and "ms_string" not in result:
+                    result["ms_string"] = pattern.to_ms_string()
                 return result
         except Exception as e:
             print("Fehler im OOK-Decoder {}: {}".format(decoder.name, e))

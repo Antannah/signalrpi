@@ -155,7 +155,7 @@ class DecoderTCM97001(BaseDecoder):
         device_id = str(int(hex_str[0:2], 16))
 
         res = {
-            "protocol": "TCM97001",
+            "protocol": "CUL_TCM97001",
             "device_id": device_id,
             "data": {
                 "temperature": temperature,
