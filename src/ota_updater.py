@@ -129,9 +129,6 @@ def update_from_github(branch="main", callback=None):
                     res = urequests.get(url)
                     if res.status_code == 200:
                         is_bin = local_name.endswith(".gz")
-                        content = res.content if is_bin else res.text
-                        res.close()
-                        res = None
                         
                         # Stelle sicher, dass Unterverzeichnisse existieren
                         if "/" in local_name:
@@ -144,10 +141,17 @@ def update_from_github(branch="main", callback=None):
                                 except OSError:
                                     pass
                                 
-                        mode = "wb" if is_bin else "w"
-                        with open(local_name, mode) as f:
-                            f.write(content)
+                        # Streame in 1 KB Chunks direkt auf Flash als Binärdaten (vermeidet UTF-8 Split & ENOMEM)
+                        with open(local_name, "wb") as f:
+                            while True:
+                                chunk = res.raw.read(1024)
+                                if not chunk:
+                                    break
+                                f.write(chunk)
+                                gc.collect()
                         
+                        res.close()
+                        res = None
                         file_downloaded = True
                         success_count += 1
                         print("OTA: {} erfolgreich aktualisiert".format(local_name))

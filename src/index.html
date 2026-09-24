@@ -279,7 +279,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
         <label style="font-size:0.75rem;color:var(--text-dim)">Ziel-Branch:</label>
         <div style="display:flex;gap:6px;margin:4px 0 10px">
           <input id="ota-branch-input" class="form-input" style="margin:0;padding:6px;font-size:0.8rem;flex:1" value="main" placeholder="z.B. main oder feature-xyz">
-          <select class="form-input" style="width:auto;margin:0;padding:6px;font-size:0.8rem" onchange="document.getElementById('ota-branch-input').value=this.value">
+          <select class="form-input" style="width:auto;margin:0;padding:6px;font-size:0.8rem" onchange="let inp=document.getElementById('ota-branch-input');inp.value=this.value;inp.dataset.userEdited='1'">
             <option value="main">main</option>
             <option value="feature-ms-pattern">feature-ms-pattern</option>
             <option value="feature-ota-hardening">feature-ota-hardening</option>
