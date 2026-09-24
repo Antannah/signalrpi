@@ -279,9 +279,9 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
         <label style="font-size:0.75rem;color:var(--text-dim)">Ziel-Branch:</label>
         <div style="display:flex;gap:6px;margin:4px 0 10px">
           <input id="ota-branch-input" class="form-input" style="margin:0;padding:6px;font-size:0.8rem;flex:1" value="main" placeholder="z.B. main oder feature-xyz">
-          <select class="form-input" style="width:auto;margin:0;padding:6px;font-size:0.8rem" onchange="let inp=document.getElementById('ota-branch-input');inp.value=this.value;inp.dataset.userEdited='1'">
+          <select id="ota-branch-select" class="form-input" style="width:auto;margin:0;padding:6px;font-size:0.8rem" onchange="document.getElementById('ota-branch-input').value=this.value">
             <option value="main">main</option>
-            <option value="feature-ms-pattern">feature-ms-pattern</option>
+            <option value="v1.1.0-alpha">v1.1.0-alpha (Tag)</option>
             <option value="feature-ota-hardening">feature-ota-hardening</option>
           </select>
         </div>
@@ -810,11 +810,6 @@ async function updateSystem(){
     }
     let suv = document.getElementById('s-updated-val');
     if(suv) suv.innerText = s.updated_at || '-';
-    let otaInp = document.getElementById('ota-branch-input');
-    if(otaInp && !otaInp.dataset.userEdited){
-      otaInp.value = curBranch;
-      otaInp.dataset.userEdited = '1';
-    }
     
     // 1. Modul 1 (433 MHz) Status
     let b4 = document.getElementById('badge-cc433');
