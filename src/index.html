@@ -379,14 +379,11 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
     <div id="raw-modal-meta" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px"></div>
     
     <div id="raw-modal-ms-container" style="display:none;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <label style="font-size:0.8rem;color:var(--accent);font-weight:600">SignalDUINO MS-Muster:</label>
-        <button class="btn" style="padding:2px 8px;font-size:0.75rem" onclick="copyRaw('ms')">📋 MS kopieren</button>
-      </div>
+      <label style="font-size:0.8rem;color:var(--accent);font-weight:600">SignalDUINO MS-Muster:</label>
       <input id="raw-modal-ms-text" class="form-input" style="font-family:monospace;font-size:0.75rem;margin:4px 0 0;color:var(--accent)" readonly>
     </div>
 
-    <label style="font-size:0.8rem;color:var(--text-dim)">Pulsfolge / Rohdaten:</label>
+    <label style="font-size:0.8rem;color:var(--text-dim)">Pulsfolge / Rohdaten (JSON Array):</label>
     <textarea id="raw-modal-text" style="width:100%;height:130px;background:rgba(15,23,42,0.9);color:#38bdf8;border:1px solid var(--border);border-radius:6px;padding:8px;font-family:monospace;font-size:0.75rem;margin:6px 0 12px;resize:vertical" readonly></textarea>
     
     <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between">
