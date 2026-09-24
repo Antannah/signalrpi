@@ -246,25 +246,9 @@ graph TD
 
 ---
 
-## 5. Geplanter Implementierungs-Workflow
+## 5. Inbetriebnahme, Installation & Konfiguration
 
-| Phase | Bezeichnung | Fokus-Bereiche / Aufgaben | Status |
-| :--- | :--- | :--- | :--- |
-| **Phase 1** | **Firmware & PIO** | - Implementierung der PIO-State-Machines zur Flankenerkennung<br>- SPI-Treiber-Initialisierung und Register-Konfiguration der CC1101-Module | **Abgeschlossen** |
-| **Phase 2** | **Logik-Portierung** | - Parser für SignalDUINO-Telegramme (Roh-Pulsfolgen)<br>- Portierung der Protokoll-Decoder (FHEM Perl $\rightarrow$ Python/C++) | **Abgeschlossen** |
-| **Phase 3** | **MQTT & Netzwerk** | - WLAN-Kopplung (Pico W) oder USB-Serial-Kommunikation<br>- MQTT-Client-Implementierung und JSON-Serialisierung der Nachrichten | **Abgeschlossen** |
-| **Phase 4** | **Validierung** | - Integrationstests mit realen 433 MHz und 868 MHz HF-Sendern<br>- Reichweiten- und Sensitivitätsoptimierung | **Abgeschlossen (Offline)** |
-
-### Fortlaufende Aufgaben & offene Punkte:
-- [x] Auswahl der Software-Plattform: **MicroPython** auf **Raspberry Pi Pico W**.
-- [x] Auswahl der primären Zielprotokolle (TFA/NC_WS, Intertechno, Bodenfeuchte/Regen-Sensoren).
-- [x] Definition der CC1101-Initialisierungs-Register für OOK (433.92 MHz) und FSK-Paketmodus (868.30 MHz).
-
----
-
-## 6. Entwicklungs-Workflow & Test-Setup
-
-Dieses Kapitel beschreibt, wie neue Software auf den Pico W übertragen wird und wie das Test-Setup (sowohl Hardware als auch Software-Simulation) aufgebaut ist.
+Dieses Kapitel beschreibt die Erst-Inbetriebnahme eines neuen Raspberry Pi Pico W, die Dateistruktur sowie Hardware- und Test-Details.
 
 ### 6.1 Installationsvorgang (Erst-Inbetriebnahme & Schnellstart)
 
@@ -389,11 +373,11 @@ MODE_868 = "FSK"
 
 ---
 
-## 7. Decoder-Spezifikation & Unterstützte Protokolle
+## 6. Decoder-Spezifikation & Unterstützte Protokolle
 
 Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen, wurden die folgenden Decoder implementiert und integriert.
 
-### 7.1 TCM97001 (TFA / NC_WS Klimasensoren)
+### 6.1 TCM97001 (TFA / NC_WS Klimasensoren)
 *   **HF-Parameter:** Frequenz 433.92 MHz, Modulation ASK/OOK.
 *   **Beschreibung:** Dieser Decoder übersetzt Signale von Temperatur- und Luftfeuchtigkeitssensoren (z. B. TFA Thermo-Hygrometer oder PEARL NC7159).
 *   **Telegramm-Format:** 36-Bit PWM (Pulse-Width Modulation via `PatternDecoder`).
@@ -417,7 +401,7 @@ Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen,
     }
     ```
 
-### 7.2 Intertechno (IT - Funkaktoren & Fernbedienungen)
+### 6.2 Intertechno (IT - Funkaktoren & Fernbedienungen)
 *   **HF-Parameter:** Frequenz 433.92 MHz, Modulation ASK/OOK.
 *   **Beschreibung:** Steuert Funksteckdosen, Einbauschalter und empfängt Signale von Handsendern und Wandschaltern.
 
@@ -455,7 +439,7 @@ Um die Kompatibilität mit Deiner bestehenden FHEM-Installation sicherzustellen,
 *   **Aufbau:** 26 Bit Rolling-Code + 1 Bit Gruppe + 1 Bit State + 4 Bit Unit/Kanal.
 *   **MQTT-Topic:** `signalrpi/messages/IT_V3/<binary_code>`
 
-### 7.3 SD_WS (SignalDUINO Wettersensoren)
+### 6.3 SD_WS (SignalDUINO Wettersensoren)
 Dieser Decoder fasst verschiedene Wettersensoren (Bodenfeuchte und Regen) zusammen, die über das SignalDUINO-Framework empfangen werden.
 
 #### SD_WS_50 (Bodenfeuchtesensoren / Opus XT300)
@@ -490,7 +474,7 @@ Dieser Decoder fasst verschiedene Wettersensoren (Bodenfeuchte und Regen) zusamm
 
 ---
 
-## 8. Lizenz & Danksagungen (Acknowledgements)
+## 7. Lizenz & Danksagungen (Acknowledgements)
 
 Dieses Projekt ist unter der **GNU General Public License v3.0 (GPLv3)** lizenziert. Siehe [LICENSE](LICENSE) für den vollständigen Lizenztext.
 
