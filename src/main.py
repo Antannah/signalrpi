@@ -463,7 +463,7 @@ if has_config:
                     
                     proto_name = decoded["protocol"] if decoded else "RAW_868_FSK"
                     dev_id_str = str(decoded["device_id"]) if decoded else payload[:4].hex().upper()
-                    raw_fsk = payload.hex().upper() if not decoded else None
+                    raw_fsk = payload.hex().upper()
                     # Rausch-Pakete (decoded == None und RSSI < -88 dBm) nicht in die Web-Sniffer-Queue schieben
                     if decoded or rssi > -88.0:
                         push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, raw_data=raw_fsk)
@@ -503,7 +503,7 @@ if has_config:
                     decoded = decoders.decode_signal(packet_868)
                     proto_name = decoded["protocol"] if decoded else "RAW_868_OOK"
                     dev_id_str = str(decoded["device_id"]) if decoded else "-"
-                    raw_ook = packet_868[:120] if not decoded else None
+                    raw_ook = packet_868[:120]
                     push_sniffer("868 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, raw_data=raw_ook)
                     if client and decoded:
                         topic = "signalrpi/messages/{}/{}".format(decoded["protocol"], decoded["device_id"])

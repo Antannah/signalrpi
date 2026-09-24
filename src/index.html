@@ -383,12 +383,12 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       <input id="raw-modal-ms-text" class="form-input" style="font-family:monospace;font-size:0.75rem;margin:4px 0 0;color:var(--accent)" readonly>
     </div>
 
-    <label style="font-size:0.8rem;color:var(--text-dim)">Pulsfolge / Rohdaten (JSON Array):</label>
+    <label id="raw-modal-data-label" style="font-size:0.8rem;color:var(--text-dim)">Pulsfolge / Rohdaten:</label>
     <textarea id="raw-modal-text" style="width:100%;height:130px;background:rgba(15,23,42,0.9);color:#38bdf8;border:1px solid var(--border);border-radius:6px;padding:8px;font-family:monospace;font-size:0.75rem;margin:6px 0 12px;resize:vertical" readonly></textarea>
     
     <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between">
       <div style="display:flex;gap:6px">
-        <button class="btn" onclick="copyRaw('json')">📋 JSON Array</button>
+        <button id="btn-copy-raw" class="btn" onclick="copyRaw('json')">📋 JSON Array</button>
         <button class="btn btn-amber" onclick="copyRaw('fhem')">📋 FHEM/SignalESP</button>
       </div>
       <button class="btn" style="background:#64748b;color:#fff" onclick="closeRawModal()">Schließen</button>
@@ -990,12 +990,19 @@ function startSniffer(){
 function openRawModal(pkt){
   currentRawData = pkt;
   let isArr = Array.isArray(pkt.raw);
-  let countInfo = isArr ? `${pkt.raw.length} Flanken / Pulse` : (pkt.raw ? `${pkt.raw.length} Zeichen (Hex-Stream)` : 'Signal-Muster');
+  let isHex = typeof pkt.raw === 'string' && /^[0-9A-Fa-f]+$/.test(pkt.raw);
+  let countInfo = isArr ? `${pkt.raw.length} Flanken / Pulse` : (isHex ? `${pkt.raw.length / 2} Bytes (${pkt.raw.length} Hex-Zeichen)` : 'Signal-Muster');
+  
   document.getElementById('raw-modal-meta').innerHTML = `
     <b>Band:</b> ${pkt.band} | <b>Signal:</b> ${pkt.proto} | <b>RSSI:</b> ${pkt.rssi} dBm | <b>Länge:</b> ${countInfo}
   `;
+  
   let msCont = document.getElementById('raw-modal-ms-container');
   let msInput = document.getElementById('raw-modal-ms-text');
+  let dataLabel = document.getElementById('raw-modal-data-label');
+  let btnCopy = document.getElementById('btn-copy-raw');
+  let ta = document.getElementById('raw-modal-text');
+
   if(pkt.ms){
     msCont.style.display = 'block';
     msInput.value = pkt.ms;
@@ -1003,12 +1010,22 @@ function openRawModal(pkt){
     msCont.style.display = 'none';
     msInput.value = '';
   }
-  let ta = document.getElementById('raw-modal-text');
+
   if(isArr){
+    if(dataLabel) dataLabel.innerText = 'Pulsfolge / Rohdaten (JSON Array):';
+    if(btnCopy) btnCopy.innerText = '📋 JSON Array';
     ta.value = JSON.stringify(pkt.raw);
+  } else if(isHex){
+    if(dataLabel) dataLabel.innerText = 'FSK-Payload (Hex-Stream):';
+    if(btnCopy) btnCopy.innerText = '📋 Hex Payload';
+    // Formatiere Hex-Bytes mit Leerzeichen (z. B. 51 0A 3B 21 ...)
+    ta.value = pkt.raw.match(/.{1,2}/g).join(' ');
   } else {
+    if(dataLabel) dataLabel.innerText = 'Rohdaten:';
+    if(btnCopy) btnCopy.innerText = '📋 Kopieren';
     ta.value = pkt.raw || pkt.ms || '';
   }
+
   document.getElementById('raw-modal').style.display = 'flex';
 }
 
@@ -1029,6 +1046,9 @@ function copyRaw(fmt){
       txt = currentRawData.ms;
     } else if(Array.isArray(currentRawData.raw)){
       txt = currentRawData.raw.map(v => (v > 0 ? '+' : '') + v).join(' ');
+    } else if(typeof currentRawData.raw === 'string'){
+      // FSK Rohdaten für FHEM (MN;D=...;R=...;)
+      txt = 'MN;D=' + currentRawData.raw + ';R=' + (currentRawData.raw.length / 2) + ';';
     } else {
       txt = currentRawData.raw || '';
     }
