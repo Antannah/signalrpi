@@ -395,8 +395,8 @@ if has_config:
                 # Debug: 433 MHz Pakete auf der seriellen Konsole ausgeben
                 print("[433 OOK] proto={} id={} ch={} rssi={:.1f}dBm decoded={} ms={}".format(
                     proto_name, dev_id_str, ch, rssi, decoded is not None, ms_str or "-"))
-                # Bei unbekannten Signalen Rohpulse (max. 120 Flanken) für Web-UI mitsenden
-                raw_to_send = packet_433[:120] if not decoded else None
+                # Rohpulse (max. 120 Flanken) für Web-UI mitsenden (auch bei erkannten Paketen)
+                raw_to_send = packet_433[:120]
                 push_sniffer("433 MHz", proto_name, dev_id_str, rssi, data=decoded.get("data") if decoded else None, channel=ch, matched_name=matched_name, raw_data=raw_to_send, ms_pattern=ms_str)
                 
                 if client:
