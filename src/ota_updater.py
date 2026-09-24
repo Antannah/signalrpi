@@ -63,11 +63,26 @@ def save_version_info(branch):
     except Exception as ex:
         print("Fehler beim Speichern von version.json:", ex)
 
+FILES_TO_CLEANUP = [
+    "index.html",
+    "static_html.py"
+]
+
+def cleanup_obsolete_files():
+    """Löscht veraltete/überflüssige Dateien aus dem Flash-Speicher."""
+    for fn in FILES_TO_CLEANUP:
+        try:
+            os.remove(fn)
+            print("OTA Cleanup: {} gelöscht".format(fn))
+        except OSError:
+            pass
+
 def update_from_github(branch="main", callback=None):
     """
     Lädt alle Kern-Dateien von GitHub herunter und speichert sie im Flash.
     Führt anschließend einen Warmstart des Pico W durch.
     """
+    cleanup_obsolete_files()
     success_count = 0
     errors = []
     base_url = GITHUB_RAW_TEMPLATE.format(branch)
