@@ -103,7 +103,7 @@ def update_from_github(branch="main", callback=None):
         local_name = file_path.replace("src/", "")
         ota_state["step"] = idx + 1
         ota_state["current_file"] = local_name
-        ota_state["message"] = f"Lade {local_name} ({idx+1}/{len(FILES_TO_UPDATE)})..."
+        ota_state["message"] = "Lade {} ({}/{})...".format(local_name, idx + 1, len(FILES_TO_UPDATE))
         
         url = "{}/{}".format(base_url, file_path)
         if callback:
@@ -165,11 +165,13 @@ def update_from_github(branch="main", callback=None):
             time.sleep_ms(300)
             
         gc.collect()
+        import time
+        time.sleep_ms(50)
 
     if len(errors) == 0 and success_count == len(FILES_TO_UPDATE):
         save_version_info(branch)
         ota_state["status"] = "rebooting"
-        ota_state["message"] = f"Update erfolgreich ({success_count}/{len(FILES_TO_UPDATE)}). Starte neu..."
+        ota_state["message"] = "Update erfolgreich ({}/{}). Starte neu...".format(success_count, len(FILES_TO_UPDATE))
         print("OTA Update abgeschlossen: {} Dateien aktualisiert. Starte neu...".format(success_count))
         if callback:
             callback("Update fertig ({} Dateien). Neustart in 2s...".format(success_count))
@@ -180,5 +182,5 @@ def update_from_github(branch="main", callback=None):
     else:
         ota_state["status"] = "error"
         err_summary = ", ".join(errors)
-        ota_state["message"] = f"Fehler bei {len(errors)} Datei(en): {err_summary}"
+        ota_state["message"] = "Fehler bei {} Datei(en): {}".format(len(errors), err_summary)
         return False, "Fehler beim OTA Update: " + err_summary

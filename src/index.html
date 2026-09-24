@@ -282,6 +282,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
           <select class="form-input" style="width:auto;margin:0;padding:6px;font-size:0.8rem" onchange="document.getElementById('ota-branch-input').value=this.value">
             <option value="main">main</option>
             <option value="feature-ms-pattern">feature-ms-pattern</option>
+            <option value="feature-ota-hardening">feature-ota-hardening</option>
           </select>
         </div>
         <button class="btn" onclick="triggerGitHubOTA()" id="btn-ota" style="width:100%">🚀 Update starten</button>
