@@ -68,6 +68,15 @@ FILES_TO_CLEANUP = [
     "static_html.py"
 ]
 
+def cleanup_obsolete_files():
+    """Löscht veraltete/überflüssige Dateien aus dem Flash-Speicher."""
+    for fn in FILES_TO_CLEANUP:
+        try:
+            os.remove(fn)
+            print("OTA Cleanup: {} gelöscht".format(fn))
+        except OSError:
+            pass
+
 # Status-Tracking für das Webinterface
 ota_state = {
     "status": "idle",       # idle, downloading, rebooting, error
@@ -87,100 +96,106 @@ def update_from_github(branch="main", callback=None):
     Führt anschließend einen Warmstart des Pico W durch.
     """
     global ota_state
-    ota_state["status"] = "downloading"
-    ota_state["branch"] = branch
-    ota_state["step"] = 0
-    ota_state["total"] = len(FILES_TO_UPDATE)
-    ota_state["message"] = "Bereinige alte Dateien..."
-    
-    cleanup_obsolete_files()
-    success_count = 0
-    errors = []
-    base_url = GITHUB_RAW_TEMPLATE.format(branch)
+    try:
+        ota_state["status"] = "downloading"
+        ota_state["branch"] = branch
+        ota_state["step"] = 0
+        ota_state["total"] = len(FILES_TO_UPDATE)
+        ota_state["message"] = "Bereinige alte Dateien..."
+        
+        cleanup_obsolete_files()
+        success_count = 0
+        errors = []
+        base_url = GITHUB_RAW_TEMPLATE.format(branch)
 
-    for idx, file_path in enumerate(FILES_TO_UPDATE):
-        # Lokaler Zielpfad: z. B. 'src/main.py' -> 'main.py'
-        local_name = file_path.replace("src/", "")
-        ota_state["step"] = idx + 1
-        ota_state["current_file"] = local_name
-        ota_state["message"] = "Lade {} ({}/{})...".format(local_name, idx + 1, len(FILES_TO_UPDATE))
-        
-        url = "{}/{}".format(base_url, file_path)
-        if callback:
-            callback("Downloading {}...".format(local_name))
-        print("OTA: Lade", url)
-        
-        file_downloaded = False
-        # Retry-Schleife (bis zu 2 Versuche je Datei)
-        for attempt in range(2):
-            gc.collect()
-            res = None
-            try:
-                res = urequests.get(url)
-                if res.status_code == 200:
-                    is_bin = local_name.endswith(".gz")
-                    content = res.content if is_bin else res.text
-                    res.close()
-                    res = None
-                    
-                    # Stelle sicher, dass Unterverzeichnisse existieren
-                    if "/" in local_name:
-                        parts = local_name.split("/")
-                        cur_dir = ""
-                        for part in parts[:-1]:
-                            cur_dir = cur_dir + "/" + part if cur_dir else part
-                            try:
-                                os.mkdir(cur_dir)
-                            except OSError:
-                                pass
-                            
-                    mode = "wb" if is_bin else "w"
-                    with open(local_name, mode) as f:
-                        f.write(content)
-                    
-                    file_downloaded = True
-                    success_count += 1
-                    print("OTA: {} erfolgreich aktualisiert".format(local_name))
-                    break
-                else:
-                    err_msg = "HTTP {} für {}".format(res.status_code, local_name)
-                    if res:
+        for idx, file_path in enumerate(FILES_TO_UPDATE):
+            # Lokaler Zielpfad: z. B. 'src/main.py' -> 'main.py'
+            local_name = file_path.replace("src/", "")
+            ota_state["step"] = idx + 1
+            ota_state["current_file"] = local_name
+            ota_state["message"] = "Lade {} ({}/{})...".format(local_name, idx + 1, len(FILES_TO_UPDATE))
+            
+            url = "{}/{}".format(base_url, file_path)
+            if callback:
+                callback("Downloading {}...".format(local_name))
+            print("OTA: Lade", url)
+            
+            file_downloaded = False
+            # Retry-Schleife (bis zu 2 Versuche je Datei)
+            for attempt in range(2):
+                gc.collect()
+                res = None
+                try:
+                    res = urequests.get(url)
+                    if res.status_code == 200:
+                        is_bin = local_name.endswith(".gz")
+                        content = res.content if is_bin else res.text
                         res.close()
+                        res = None
+                        
+                        # Stelle sicher, dass Unterverzeichnisse existieren
+                        if "/" in local_name:
+                            parts = local_name.split("/")
+                            cur_dir = ""
+                            for part in parts[:-1]:
+                                cur_dir = cur_dir + "/" + part if cur_dir else part
+                                try:
+                                    os.mkdir(cur_dir)
+                                except OSError:
+                                    pass
+                                
+                        mode = "wb" if is_bin else "w"
+                        with open(local_name, mode) as f:
+                            f.write(content)
+                        
+                        file_downloaded = True
+                        success_count += 1
+                        print("OTA: {} erfolgreich aktualisiert".format(local_name))
+                        break
+                    else:
+                        err_msg = "HTTP {} für {}".format(res.status_code, local_name)
+                        if res:
+                            res.close()
+                        if attempt == 1:
+                            errors.append(err_msg)
+                            print("OTA Fehler:", err_msg)
+                except Exception as ex:
+                    if res:
+                        try:
+                            res.close()
+                        except Exception:
+                            pass
+                    err_msg = "{}: {}".format(local_name, ex)
                     if attempt == 1:
                         errors.append(err_msg)
-                        print("OTA Fehler:", err_msg)
-            except Exception as ex:
-                if res:
-                    try:
-                        res.close()
-                    except Exception:
-                        pass
-                err_msg = "{}: {}".format(local_name, ex)
-                if attempt == 1:
-                    errors.append(err_msg)
-                    print("OTA Exception:", err_msg)
-            
-            # Kurze Pause vor dem Retry
+                        print("OTA Exception:", err_msg)
+                
+                # Kurze Pause vor dem Retry
+                import time
+                time.sleep_ms(300)
+                
+            gc.collect()
             import time
-            time.sleep_ms(300)
-            
-        gc.collect()
-        import time
-        time.sleep_ms(50)
+            time.sleep_ms(50)
 
-    if len(errors) == 0 and success_count == len(FILES_TO_UPDATE):
-        save_version_info(branch)
-        ota_state["status"] = "rebooting"
-        ota_state["message"] = "Update erfolgreich ({}/{}). Starte neu...".format(success_count, len(FILES_TO_UPDATE))
-        print("OTA Update abgeschlossen: {} Dateien aktualisiert. Starte neu...".format(success_count))
-        if callback:
-            callback("Update fertig ({} Dateien). Neustart in 2s...".format(success_count))
-        import time
-        time.sleep(2)
-        machine.reset()
-        return True, "Update erfolgreich"
-    else:
+        if len(errors) == 0 and success_count == len(FILES_TO_UPDATE):
+            save_version_info(branch)
+            ota_state["status"] = "rebooting"
+            ota_state["message"] = "Update erfolgreich ({}/{}). Starte neu...".format(success_count, len(FILES_TO_UPDATE))
+            print("OTA Update abgeschlossen: {} Dateien aktualisiert. Starte neu...".format(success_count))
+            if callback:
+                callback("Update fertig ({} Dateien). Neustart in 2s...".format(success_count))
+            import time
+            time.sleep(2)
+            machine.reset()
+            return True, "Update erfolgreich"
+        else:
+            ota_state["status"] = "error"
+            err_summary = ", ".join(errors)
+            ota_state["message"] = "Fehler bei {} Datei(en): {}".format(len(errors), err_summary)
+            return False, "Fehler beim OTA Update: " + err_summary
+    except Exception as fatal_ex:
         ota_state["status"] = "error"
-        err_summary = ", ".join(errors)
-        ota_state["message"] = "Fehler bei {} Datei(en): {}".format(len(errors), err_summary)
-        return False, "Fehler beim OTA Update: " + err_summary
+        ota_state["message"] = "Absturz während OTA: {}".format(fatal_ex)
+        print("Fatal OTA Error:", fatal_ex)
+        return False, str(fatal_ex)
