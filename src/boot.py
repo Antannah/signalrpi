@@ -7,13 +7,17 @@ import machine
 
 print("Booting signalrpi...")
 
-# Versuche, die lokale Konfiguration zu laden
+# Versuche, die Konfiguration aus config_loader (config.json) oder config_local zu laden
 try:
-    import config_local as config
-    has_config = True
-except ImportError:
-    print("Warnung: config_local.py nicht gefunden. WLAN-Verbindung übersprungen.")
-    has_config = False
+    from config_loader import config
+    has_config = bool(config.WIFI_SSID)
+except Exception:
+    try:
+        import config_local as config
+        has_config = True
+    except ImportError:
+        print("Warnung: Keine WLAN-Konfiguration gefunden. WLAN-Verbindung übersprungen.")
+        has_config = False
 
 def do_connect():
     if not has_config:

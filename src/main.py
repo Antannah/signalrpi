@@ -25,13 +25,17 @@ try:
 except Exception:
     led = None
 
-# Versuche, die lokale Konfiguration zu laden
+# Versuche, die Konfiguration aus config_loader (config.json) oder config_local zu laden
 try:
-    import config_local as config
+    from config_loader import config
     has_config = True
-except ImportError:
-    print("Fehler: config_local.py nicht gefunden. Beende.")
-    has_config = False
+except Exception:
+    try:
+        import config_local as config
+        has_config = True
+    except ImportError:
+        print("Fehler: Weder config.json noch config_local.py gefunden.")
+        has_config = False
 
 if has_config:
     # 1. SPI-Busse für CC1101-Module initialisieren (2 getrennte Hardware-Controller)

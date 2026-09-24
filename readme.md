@@ -23,7 +23,7 @@ graph TD
     Comm -->|MQTT / TCP| Broker[MQTT Broker]
 ```
  
-### 1.1 Pin-Belegung (RP2040 zu 2× CC1101 via getrennte SPI-Busse)
+### 1.1 Pin-Belegung (RP2040 zu 2× CC1101 via getrennten SPI-Bussen)
 
 Die beiden CC1101-Module nutzen zwei **getrennte Hardware-SPI-Controller** des RP2040 (SPI1 auf der linken Pinleiste, SPI0 auf der rechten Pinleiste). Dadurch werden Buskollisionen und kapazitive Lasten auf den Leitungen vermieden.
 
@@ -266,22 +266,44 @@ graph TD
 
 Dieses Kapitel beschreibt, wie neue Software auf den Pico W übertragen wird und wie das Test-Setup (sowohl Hardware als auch Software-Simulation) aufgebaut ist.
 
-### 6.1 Code-Deployment & Dateistruktur
+### 6.1 Schnellstart: Automatische Installation (`install.py`)
 
-Die Skripte im Verzeichnis `src/` werden direkt auf das Flash-Dateisystem des Raspberry Pi Pico W übertragen.
+Für das Einrichten eines neuen SignalRPI (oder nach einem Firmware-Update) steht ein automatisches Setup-Skript bereit:
+
+```bash
+# 1. Repository klonen & Verzeichnis betreten
+git clone https://github.com/Antannah/signalrpi.git
+cd signalrpi
+
+# 2. Pico W per USB anstecken und Installer starten
+python install.py
+```
+
+Das Skript führt interaktiv durch die Schritte:
+- Erkennt automatisch den COM-Port des Pico W.
+- Fragt nach WLAN-SSID und Passwort und speichert sie in `config.json`.
+- Komprimiert das Web-Dashboard mit `gzip` (`index.html.gz`).
+- Überträgt alle benötigten Dateien und Bibliotheken per `mpremote`.
+- Startet den Pico W neu und meldet die direkte IP-Adresse für den Browser.
+
+---
+
+### 6.2 Dateistruktur auf dem Flash-Speicher
+
+Dank der Gzip-Kompression des Web-Dashboards und der Bereinigung redundanter Module stehen **~500 KB freier Flash-Speicher** für zusätzliche Protokolle und Logs zur Verfügung:
 
 ```text
 / (Pico Flash Root)
 ├── boot.py               # WLAN-Start vor main.py
-├── config_local.py       # WLAN- & MQTT-Zugangsdaten, Pins, Betriebsmodus
+├── config.json           # Zentrale Konfiguration (WLAN, MQTT, RF-Modus)
+├── config_loader.py      # Einheitlicher Konfigurations-Manager
 ├── main.py               # Hauptprogramm: Kooperative Schleife (Radio, MQTT, Web)
 ├── cc1101.py             # Low-Level SPI-Treiber für CC1101
-├── pio_receiver.py       # PIO-State-Machine für $\mu$s-genaue OOK-Flankenerfassung
+├── pio_receiver.py       # PIO-State-Machine für µs-genaue OOK-Flankenerfassung
 ├── device_manager.py     # Geräteverwaltung, Profil-Zuweisung & HA Auto-Discovery
 ├── devices.json          # Persistente Konfiguration der registrierten Funkgeräte
-├── web_server.py         # Asynchroner Webserver (REST-API & Sniffer-Stream)
-├── index.html            # Web-Dashboard (Single Page App)
-├── static_html.py        # Komprimierte/Inline-Auslieferung für Webserver
+├── web_server.py         # Asynchroner Webserver (REST-API & Gzip-Streaming)
+├── index.html.gz         # Komprimiertes Web-Dashboard (~17 KB statt 74 KB)
 ├── time_sync.py          # NTP-Zeitsynchronisation
 ├── ota_updater.py        # GitHub-OTA Update-Mechanismus
 ├── en_decoders/          # Protokoll-Decoder und Encoder
@@ -301,21 +323,7 @@ Die Skripte im Verzeichnis `src/` werden direkt auf das Flash-Dateisystem des Ra
         └── simple.mpy    # Kompiliertes Bytecode-Modul
 ```
 
-*   **VS Code + "MicroPico"-Extension (Empfohlen):**
-    1. Pico W per USB-Kabel mit dem PC verbinden.
-    2. In VS Code den Befehl `MicroPico: Upload Project` ausführen.
-    3. Über den Button "Terminal" (unten in VS Code) direkt auf die interaktive Python-Konsole (REPL) zugreifen.
-*   **Kommandozeile (mpremote):**
-    *   Installation via `pip install mpremote`.
-    *   Dateien hochladen:
-        ```bash
-        mpremote fs cp src/main.py :main.py
-        mpremote fs cp src/device_manager.py :device_manager.py
-        mpremote fs cp -r src/en_decoders :en_decoders
-        ```
-    *   Konsole öffnen: `mpremote repl`
-
-### 6.2 Hardware-Testaufbau & Sicherheitshinweise
+### 6.3 Hardware-Testaufbau & Sicherheitshinweise
 
 Die beiden CC1101-Module werden direkt über den SPI0-Bus an den Pico W angeschlossen (siehe Belegungsplan in Kapitel 1.1).
 
@@ -465,6 +473,4 @@ Dieses Projekt ist unter der **GNU General Public License v3.0 (GPLv3)** lizenzi
 ### Danksagung
 Ein herzlicher Dank geht an die Open-Source-Community rund um das FHEM- und RF-Ökosystem, insbesondere an das Team von **[RFD-FHEM](https://github.com/RFD-FHEM)**:
 *   **[SignalDUINO](https://github.com/RFD-FHEM/RFFHEM)** / **[RFFHEM](https://github.com/RFD-FHEM/RFFHEM)**: Für die Pionierarbeit bei der Erfassung, Dokumentation und Dekodierung zahlloser 433- und 868-MHz-Funkprotokolle.
-*   **[PySignalduino](https://github.com/RFD-FHEM/PySignalduino)**: Für die Inspiration und Referenzmodelle zur Repräsentation von Signalfolgen in Python.
-
 

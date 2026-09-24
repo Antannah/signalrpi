@@ -212,6 +212,44 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
   </div>
 
   <div class="card">
+    <h3>📡 MQTT-Broker & HF-Einstellungen</h3>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin:8px 0 16px">Passe den MQTT-Broker für Home Assistant / FHEM und den CC1101 868 MHz Betriebsmodus an.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:12px">
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-dim)">MQTT Broker IP / Hostname:</label>
+        <input id="cfg-mqtt-broker" class="form-input" type="text" placeholder="192.168.125.4">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-dim)">MQTT Port:</label>
+        <input id="cfg-mqtt-port" class="form-input" type="number" value="1883">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-dim)">MQTT Benutzer (optional):</label>
+        <input id="cfg-mqtt-user" class="form-input" type="text" placeholder="leer lassen falls anonym">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-dim)">MQTT Passwort (optional):</label>
+        <input id="cfg-mqtt-password" class="form-input" type="password" placeholder="Passwort eingeben">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-dim)">MQTT Client-ID:</label>
+        <input id="cfg-mqtt-client-id" class="form-input" type="text" value="signalrpi">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:var(--text-dim)">CC1101 868 MHz Betriebsmodus:</label>
+        <select id="cfg-mode-868" class="form-input">
+          <option value="FSK">2-FSK Paketmodus (Fine Offset, Ecowitt WH51 / WH40)</option>
+          <option value="OOK">ASK/OOK Asynchron (FS20, MAX!, etc.)</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn" onclick="saveSettings()">💾 MQTT-Einstellungen speichern & neu verbinden</button>
+      <span id="cfg-status" style="font-size:0.85rem;color:var(--green)"></span>
+    </div>
+  </div>
+
+  <div class="card">
     <h3>🕒 Datum, Uhrzeit & NTP-Zeitzone</h3>
     <div style="max-width:420px;margin-top:1rem">
       <label style="font-size:0.85rem;color:var(--text-dim)">Zeitzone / UTC-Offset (Stunden):</label>
@@ -1520,9 +1558,64 @@ async function uploadDevicesJson(){
   }
 }
 
+async function loadSettings(){
+  try{
+    let res = await fetch('/api/settings');
+    if(res.ok){
+      let d = await res.json();
+      if(d.mqtt_broker) document.getElementById('cfg-mqtt-broker').value = d.mqtt_broker;
+      if(d.mqtt_port) document.getElementById('cfg-mqtt-port').value = d.mqtt_port;
+      if(d.mqtt_user) document.getElementById('cfg-mqtt-user').value = d.mqtt_user;
+      if(d.mqtt_has_password) document.getElementById('cfg-mqtt-password').placeholder = '●●●●●●●● (Gespeichert)';
+      if(d.mqtt_client_id) document.getElementById('cfg-mqtt-client-id').value = d.mqtt_client_id;
+      if(d.mode_868) document.getElementById('cfg-mode-868').value = d.mode_868;
+    }
+  }catch(e){}
+}
+
+async function saveSettings(){
+  let broker = document.getElementById('cfg-mqtt-broker').value.trim();
+  let port = parseInt(document.getElementById('cfg-mqtt-port').value.trim()) || 1883;
+  let user = document.getElementById('cfg-mqtt-user').value.trim();
+  let password = document.getElementById('cfg-mqtt-password').value;
+  let clientId = document.getElementById('cfg-mqtt-client-id').value.trim() || 'signalrpi';
+  let mode868 = document.getElementById('cfg-mode-868').value;
+  let st = document.getElementById('cfg-status');
+
+  let payload = {
+    mqtt_broker: broker,
+    mqtt_port: port,
+    mqtt_user: user,
+    mqtt_client_id: clientId,
+    mode_868: mode868
+  };
+  if(password) payload.mqtt_password = password;
+
+  st.innerText = 'Speichere...';
+  try{
+    let res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(res.ok){
+      st.innerText = 'Gespeichert! Starte MQTT neu...';
+      showToast('MQTT-Einstellungen gespeichert!', 'success');
+      setTimeout(()=>{ st.innerText = ''; }, 4000);
+    } else {
+      st.innerText = 'Fehler beim Speichern!';
+      showToast('Fehler beim Speichern', 'error');
+    }
+  }catch(e){
+    st.innerText = 'Netzwerkfehler: ' + e;
+    showToast('Netzwerkfehler: ' + e, 'error');
+  }
+}
+
 refreshDevices();
 updateSystem();
 loadTimeSettings();
+loadSettings();
 startSniffer();
 setInterval(updateSystem, 8000);
 setInterval(refreshDevices, 5000);

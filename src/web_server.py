@@ -48,22 +48,35 @@ class WebServer:
 
             # Routing
             if url == "/" or url.startswith("/index"):
-                # HTML Dashboard chunked streamen aus Datei (extrem RAM-schonend)
-                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n")
-                await writer.drain()
+                # Bevorzuge komprimiertes index.html.gz (extrem schnell & spart 130 KB Flash)
                 try:
-                    with open("index.html", "r") as f:
+                    import os
+                    # Prüfe ob index.html.gz existiert
+                    os.stat("index.html.gz")
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Encoding: gzip\r\nConnection: close\r\n\r\n")
+                    await writer.drain()
+                    with open("index.html.gz", "rb") as f:
                         while True:
                             chunk = f.read(1024)
                             if not chunk:
                                 break
-                            writer.write(chunk.encode("utf-8"))
+                            writer.write(chunk)
                             await writer.drain()
                 except Exception:
-                    # Fallback falls index.html noch nicht existiert
-                    from static_html import HTML_PAGE
-                    writer.write(HTML_PAGE.encode("utf-8"))
+                    # Fallback auf unkomprimiertes index.html
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n")
                     await writer.drain()
+                    try:
+                        with open("index.html", "r") as f:
+                            while True:
+                                chunk = f.read(1024)
+                                if not chunk:
+                                    break
+                                writer.write(chunk.encode("utf-8"))
+                                await writer.drain()
+                    except Exception as err:
+                        writer.write(b"<h1>SignalRPI Webinterface Fehler</h1><p>" + str(err).encode("utf-8") + b"</p>")
+                        await writer.drain()
 
             elif url == "/favicon.ico":
                 fav = b"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='#0f172a'/><path d='M30 68 C30 52 42 40 58 40 M30 80 C30 58 48 40 70 40' stroke='#38bdf8' stroke-width='7' stroke-linecap='round' fill='none'/><path d='M25 55 C25 35 40 20 65 20 M25 42 C25 22 45 10 75 10' stroke='#38bdf8' stroke-width='7' stroke-linecap='round' fill='none' opacity='0.7'/><circle cx='30' cy='75' r='7' fill='#38bdf8'/></svg>"
@@ -112,6 +125,47 @@ class WebServer:
                     writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
                     writer.write(json.dumps({"ok": True, "time": timestr, "server": srv}).encode("utf-8"))
                 except Exception as ex:
+                    writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+
+            elif url == "/api/settings" and method == "GET":
+                try:
+                    from config_loader import config
+                    resp_cfg = {
+                        "mqtt_broker": config.MQTT_BROKER,
+                        "mqtt_port": config.MQTT_PORT,
+                        "mqtt_user": config.MQTT_USER or "",
+                        "mqtt_has_password": bool(config.MQTT_PASSWORD),
+                        "mqtt_client_id": config.MQTT_CLIENT_ID,
+                        "mode_868": config.MODE_868,
+                        "wifi_ssid": config.WIFI_SSID
+                    }
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n")
+                    writer.write(json.dumps(resp_cfg).encode("utf-8"))
+                except Exception as e:
+                    writer.write(b"HTTP/1.1 500 Internal Server Error\r\nConnection: close\r\n\r\n")
+
+            elif url == "/api/settings" and method == "POST":
+                body = await reader.read(content_len) if content_len > 0 else b"{}"
+                try:
+                    from config_loader import config
+                    data = json.loads(body.decode("utf-8"))
+                    # MQTT-Einstellungen aktualisieren
+                    if "mqtt_broker" in data:
+                        config.data["mqtt"]["broker"] = str(data["mqtt_broker"]).strip()
+                    if "mqtt_port" in data:
+                        config.data["mqtt"]["port"] = int(data["mqtt_port"])
+                    if "mqtt_user" in data:
+                        config.data["mqtt"]["user"] = str(data["mqtt_user"]).strip() or None
+                    if "mqtt_password" in data and data["mqtt_password"]:
+                        config.data["mqtt"]["password"] = str(data["mqtt_password"]).strip()
+                    if "mqtt_client_id" in data:
+                        config.data["mqtt"]["client_id"] = str(data["mqtt_client_id"]).strip() or "signalrpi"
+                    if "mode_868" in data and data["mode_868"] in ["FSK", "OOK"]:
+                        config.data["rf"]["mode_868"] = data["mode_868"]
+                    
+                    config.save()
+                    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                except Exception as e:
                     writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
 
             elif url == "/api/devices/download":
