@@ -86,12 +86,17 @@ class WebServer:
             elif url == "/api/status":
                 gc.collect()
                 ip = self.wlan.ifconfig()[0] if self.wlan.isconnected() else "Offline"
+                import ota_updater
+                ver_info = ota_updater.get_version_info()
                 status = {
                     "ip": ip,
                     "wifi_rssi": getattr(self.wlan, "status")('rssi') if hasattr(self.wlan, 'status') else -50,
                     "free_ram": gc.mem_free(),
                     "allocated_ram": gc.mem_alloc(),
-                    "alerts": getattr(self, "alerts", [])
+                    "alerts": getattr(self, "alerts", []),
+                    "version": ver_info.get("version", "1.2.0"),
+                    "branch": ver_info.get("branch", "main"),
+                    "updated_at": ver_info.get("updated_at", "-")
                 }
                 if hasattr(self, "cc_433") and self.cc_433:
                     status["cc_433"] = self.cc_433.check_hardware()
