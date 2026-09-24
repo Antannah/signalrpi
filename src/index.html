@@ -1584,12 +1584,14 @@ async function triggerGitHubOTA(){
     }
 
     // Polle den Fortschritt über /api/ota/status
+    let downloadSeen = false;
     let pollInterval = setInterval(async ()=>{
       try{
         let r = await fetch('/api/ota/status');
         if(r.ok){
           let data = await r.json();
           if(data.status === 'downloading'){
+            downloadSeen = true;
             let pct = Math.max(10, Math.round((data.step / (data.total || 1)) * 90));
             if(pBar) pBar.style.width = pct + '%';
             st.innerText = data.message || ('Lade ' + data.current_file + '...');
@@ -1598,7 +1600,7 @@ async function triggerGitHubOTA(){
             if(pBar) { pBar.style.width = '100%'; pBar.style.background = 'var(--green)'; }
             st.innerText = data.message || 'Update fertig! Pico startet neu... Verbinde in 7s...';
             setTimeout(()=>{ location.reload(); }, 7500);
-          } else if(data.status === 'error'){
+          } else if(data.status === 'error' && downloadSeen){
             clearInterval(pollInterval);
             if(pBar) { pBar.style.background = 'var(--red)'; }
             st.innerText = data.message || 'Fehler beim Download!';

@@ -346,6 +346,15 @@ class WebServer:
                 except Exception:
                     pass
 
+                # Vorab sofort Status auf downloading setzen, damit UI-Polling nie alten Fehler sieht
+                import ota_updater
+                ota_updater.ota_state["status"] = "downloading"
+                ota_updater.ota_state["branch"] = branch
+                ota_updater.ota_state["step"] = 0
+                ota_updater.ota_state["total"] = len(ota_updater.FILES_TO_UPDATE)
+                ota_updater.ota_state["current_file"] = ""
+                ota_updater.ota_state["message"] = "Bereinige alte Dateien..."
+
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"status\":\"started\",\"branch\":\"" + branch.encode("utf-8") + b"\"}")
                 await writer.drain()
                 await writer.aclose()
@@ -353,7 +362,7 @@ class WebServer:
                 # Starte OTA entkoppelt als asynchronen Hintergrund-Task, um TCP-Verbindung sofort freizugeben
                 async def run_ota_task(target_branch):
                     import asyncio, ota_updater, gc
-                    await asyncio.sleep_ms(200)
+                    await asyncio.sleep_ms(300)
                     gc.collect()
                     try:
                         ota_updater.update_from_github(branch=target_branch)
