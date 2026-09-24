@@ -78,6 +78,8 @@ def cleanup_obsolete_files():
             pass
 
 # Status-Tracking für das Webinterface
+is_updating = False
+
 ota_state = {
     "status": "idle",       # idle, downloading, rebooting, error
     "branch": "main",
@@ -95,8 +97,9 @@ def update_from_github(branch="main", callback=None):
     Lädt alle Kern-Dateien von GitHub herunter und speichert sie im Flash.
     Führt anschließend einen Warmstart des Pico W durch.
     """
-    global ota_state
+    global ota_state, is_updating
     try:
+        is_updating = True
         ota_state["status"] = "downloading"
         ota_state["branch"] = branch
         ota_state["step"] = 0
@@ -194,11 +197,13 @@ def update_from_github(branch="main", callback=None):
             machine.reset()
             return True, "Update erfolgreich"
         else:
+            is_updating = False
             ota_state["status"] = "error"
             err_summary = ", ".join(errors)
             ota_state["message"] = "Fehler bei {} Datei(en): {}".format(len(errors), err_summary)
             return False, "Fehler beim OTA Update: " + err_summary
     except Exception as fatal_ex:
+        is_updating = False
         ota_state["status"] = "error"
         ota_state["message"] = "Absturz während OTA: {}".format(fatal_ex)
         print("Fatal OTA Error:", fatal_ex)

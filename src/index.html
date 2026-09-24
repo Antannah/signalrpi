@@ -276,14 +276,17 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
         <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px" id="ota-current-info">
           Version: <b id="s-ver-val" style="color:var(--text)">...</b> | Branch: <b id="s-branch-val" style="color:var(--accent)">...</b> | Stand: <b id="s-updated-val" style="color:var(--text)">...</b>
         </div>
-        <label style="font-size:0.75rem;color:var(--text-dim)">Ziel-Branch:</label>
-        <div style="display:flex;gap:6px;margin:4px 0 10px">
-          <input id="ota-branch-input" class="form-input" style="margin:0;padding:6px;font-size:0.8rem;flex:1" value="main" placeholder="z.B. main oder feature-xyz">
-          <select id="ota-branch-select" class="form-input" style="width:auto;margin:0;padding:6px;font-size:0.8rem" onchange="document.getElementById('ota-branch-input').value=this.value">
-            <option value="main">main</option>
-            <option value="v1.1.0-alpha">v1.1.0-alpha (Tag)</option>
+        <label style="font-size:0.75rem;color:var(--text-dim)">Ziel-Version / Branch:</label>
+        <div style="margin:4px 0 10px">
+          <select id="ota-branch-select" class="form-input" style="width:100%;margin:0 0 6px;padding:7px;font-size:0.85rem" onchange="onOtaSelectChange(this.value)">
+            <option value="main">main (Standard-Branch)</option>
+            <option value="v1.1.0-alpha">v1.1.0-alpha (Stabiler Release-Tag)</option>
             <option value="feature-ota-hardening">feature-ota-hardening</option>
+            <option value="__custom__">Anderer Branch / Tag manuell eingeben...</option>
           </select>
+          <div id="ota-custom-branch-wrap" style="display:none">
+            <input id="ota-branch-input" class="form-input" style="margin:0;padding:6px;font-size:0.8rem;width:100%" value="main" placeholder="z.B. main, feature-xyz oder v1.x">
+          </div>
         </div>
         <button class="btn" onclick="triggerGitHubOTA()" id="btn-ota" style="width:100%">🚀 Update starten</button>
         <div id="ota-progress-box" style="display:none;margin-top:10px">
@@ -1555,9 +1558,28 @@ async function saveITDevice(){
   }
 }
 
+function onOtaSelectChange(val){
+  let wrap = document.getElementById('ota-custom-branch-wrap');
+  let inp = document.getElementById('ota-branch-input');
+  if(val === '__custom__'){
+    if(wrap) wrap.style.display = 'block';
+    if(inp){ inp.focus(); }
+  } else {
+    if(wrap) wrap.style.display = 'none';
+    if(inp){ inp.value = val; }
+  }
+}
+
 async function triggerGitHubOTA(){
-  let branch = (document.getElementById('ota-branch-input') ? document.getElementById('ota-branch-input').value.trim() : '') || 'main';
-  if(!confirm('GitHub OTA Update von Branch "' + branch + '" jetzt starten? Der Pico lädt die Dateien herunter und startet neu.')) return;
+  let sel = document.getElementById('ota-branch-select');
+  let inp = document.getElementById('ota-branch-input');
+  let branch = 'main';
+  if(sel && sel.value !== '__custom__'){
+    branch = sel.value;
+  } else if(inp && inp.value.trim()){
+    branch = inp.value.trim();
+  }
+  if(!confirm('GitHub OTA Update auf "' + branch + '" jetzt starten? Der Pico lädt die Dateien herunter und startet neu.')) return;
   let btn = document.getElementById('btn-ota');
   let st = document.getElementById('ota-status');
   let pBox = document.getElementById('ota-progress-box');

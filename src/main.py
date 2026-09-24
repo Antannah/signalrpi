@@ -341,6 +341,14 @@ if has_config:
         global client, last_mqtt_ping
         gc_counter = 0
         while True:
+            # Während eines OTA-Updates Funk- und MQTT-Aktivität pausieren (schützt vor TLS ENOMEM)
+            import ota_updater
+            if ota_updater.is_updating:
+                del sniffer_queue[:]
+                gc.collect()
+                await asyncio.sleep_ms(500)
+                continue
+
             # 1. WLAN Überwachung & Auto-Reconnect
             if not wlan.isconnected():
                 try:
