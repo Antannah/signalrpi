@@ -94,7 +94,7 @@ class WebServer:
                     "free_ram": gc.mem_free(),
                     "allocated_ram": gc.mem_alloc(),
                     "alerts": getattr(self, "alerts", []),
-                    "version": ver_info.get("version", "1.2.0"),
+                    "version": ver_info.get("version", "1.0.0-alpha"),
                     "branch": ver_info.get("branch", "main"),
                     "updated_at": ver_info.get("updated_at", "-")
                 }
