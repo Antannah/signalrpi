@@ -153,8 +153,15 @@ def update_from_github(branch="main", callback=None):
                                 f.write(chunk)
                                 gc.collect()
                         
+                        try:
+                            if hasattr(res, "raw") and res.raw:
+                                res.raw.close()
+                        except Exception:
+                            pass
                         res.close()
+                        del res
                         res = None
+                        gc.collect()
                         file_downloaded = True
                         success_count += 1
                         print("OTA: {} erfolgreich aktualisiert".format(local_name))
@@ -162,16 +169,31 @@ def update_from_github(branch="main", callback=None):
                     else:
                         err_msg = "HTTP {} für {}".format(res.status_code, local_name)
                         if res:
+                            try:
+                                if hasattr(res, "raw") and res.raw:
+                                    res.raw.close()
+                            except Exception:
+                                pass
                             res.close()
+                            del res
+                            res = None
                         if attempt == 1:
                             errors.append(err_msg)
                             print("OTA Fehler:", err_msg)
                 except Exception as ex:
                     if res:
                         try:
+                            if hasattr(res, "raw") and res.raw:
+                                res.raw.close()
+                        except Exception:
+                            pass
+                        try:
                             res.close()
                         except Exception:
                             pass
+                        del res
+                        res = None
+                    gc.collect()
                     err_msg = "{}: {}".format(local_name, ex)
                     if attempt == 1:
                         errors.append(err_msg)
