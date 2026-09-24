@@ -12,6 +12,7 @@ FILES_TO_UPDATE = [
     "src/web_server.py",
     "src/device_manager.py",
     "src/index.html",
+    "src/index.html.gz",
     "src/static_html.py",
     "src/cc1101.py",
     "src/pio_receiver.py",
@@ -86,7 +87,8 @@ def update_from_github(branch="main", callback=None):
         try:
             res = urequests.get(url)
             if res.status_code == 200:
-                content = res.text
+                is_bin = local_name.endswith(".gz")
+                content = res.content if is_bin else res.text
                 res.close()
                 
                 # Prüfe, ob Unterverzeichnis existiert (z. B. decoders/)
@@ -97,7 +99,8 @@ def update_from_github(branch="main", callback=None):
                     except OSError:
                         pass
                         
-                with open(local_name, "w") as f:
+                mode = "wb" if is_bin else "w"
+                with open(local_name, mode) as f:
                     f.write(content)
                 success_count += 1
                 print("OTA: {} erfolgreich aktualisiert".format(local_name))
