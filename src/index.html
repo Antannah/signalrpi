@@ -274,7 +274,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
       <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
         <h4 style="color:var(--accent);margin-bottom:8px">1. GitHub OTA Update</h4>
         <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px" id="ota-current-info">
-          Version: <b id="s-ver-val" style="color:var(--text)">...</b> | Branch: <b id="s-branch-val" style="color:var(--accent)">...</b>
+          Version: <b id="s-ver-val" style="color:var(--text)">...</b> | Branch: <b id="s-branch-val" style="color:var(--accent)">...</b> | Stand: <b id="s-updated-val" style="color:var(--text)">...</b>
         </div>
         <label style="font-size:0.75rem;color:var(--text-dim)">Ziel-Branch:</label>
         <div style="display:flex;gap:6px;margin:4px 0 10px">
@@ -808,6 +808,8 @@ async function updateSystem(){
       sbv.innerText = curBranch;
       sbv.style.color = (curBranch === 'main') ? 'var(--accent)' : 'var(--amber)';
     }
+    let suv = document.getElementById('s-updated-val');
+    if(suv) suv.innerText = s.updated_at || '-';
     let otaInp = document.getElementById('ota-branch-input');
     if(otaInp && !otaInp.dataset.userEdited){
       otaInp.value = curBranch;
@@ -1582,6 +1584,9 @@ async function triggerGitHubOTA(){
       btn.disabled = false;
       return;
     }
+
+    if(pBar) pBar.style.width = '10%';
+    st.innerText = 'Bereinige alte Dateien & bereite Download vor...';
 
     // Polle den Fortschritt über /api/ota/status
     let downloadSeen = false;
