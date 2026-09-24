@@ -266,25 +266,49 @@ graph TD
 
 Dieses Kapitel beschreibt, wie neue Software auf den Pico W übertragen wird und wie das Test-Setup (sowohl Hardware als auch Software-Simulation) aufgebaut ist.
 
-### 6.1 Schnellstart: Automatische Installation (`install.py`)
+### 6.1 Installationsvorgang (Erst-Inbetriebnahme & Schnellstart)
 
-Für das Einrichten eines neuen SignalRPI (oder nach einem Firmware-Update) steht ein automatisches Setup-Skript bereit:
+Dieser Abschnitt beschreibt das vollständige Aufsetzen eines fabrikneuen **Raspberry Pi Pico W** bis zum betriebsbereiten Funk-Gateway.
 
-```bash
-# 1. Repository klonen & Verzeichnis betreten
-git clone https://github.com/Antannah/signalrpi.git
-cd signalrpi
+#### Schritt 1: MicroPython auf den Pico W aufspielen (einmalig)
+Falls auf dem Pico W noch kein MicroPython installiert ist:
+1. Den weißen **`BOOTSEL`**-Taster auf der Oberseite des Pico W gedrückt halten und das Board per USB an den PC anschließen.
+2. Der Pico meldet sich als USB-Massenspeicher namens `RPI-RP2` an.
+3. Die offizielle MicroPython `.uf2`-Firmware für den **Raspberry Pi Pico W** (empfohlen: v1.22 oder neuer) von [micropython.org/download/RPI_PICO_W](https://micropython.org/download/RPI_PICO_W/) herunterladen.
+4. Die `.uf2`-Datei auf das Laufwerk `RPI-RP2` ziehen. Der Pico trennt das USB-Laufwerk automatisch, startet neu und führt ab jetzt MicroPython aus.
 
-# 2. Pico W per USB anstecken und Installer starten
-python install.py
-```
+#### Schritt 2: Automatisches Deployment mit dem Installer (`install.py`)
+1. Das Projekt-Repository auf dem PC klonen:
+   ```bash
+   git clone https://github.com/Antannah/signalrpi.git
+   cd signalrpi
+   ```
+2. Den interaktiven Installer starten (erfordert Python 3 auf dem PC; `mpremote` und `pyserial` werden bei Bedarf automatisch nachinstalliert):
+   ```bash
+   python install.py
+   ```
+3. **Geführter Ablauf im Terminal:**
+   * **Port-Erkennung:** Findet automatisch den angeschlossenen COM-Port des Pico W.
+   * **WLAN-Abfrage:** Fragt interaktiv nach der lokalen **WLAN-SSID** und dem **WLAN-Passwort**.
+   * **Asset-Kompression:** Komprimiert das Web-Dashboard mit gzip zu `src/index.html.gz` (~17 KB).
+   * **Dateitransfer:** Überträgt alle Firmware-Module, Decoder und Bibliotheken sauber auf den Flash-Speicher des Pico.
+   * **Neustart & IP-Ausgabe:** Startet den Pico W neu, wartet auf die Zuweisung der IP-Adresse im Heimnetz und gibt den direkten Link aus:
+     ```text
+     =================================================================
+     🎉 INSTALLATION ERFOLGREICH!
+     
+     👉 Web-Dashboard erreichbar unter:  http://192.168.125.78
+     
+     Du kannst jetzt im Web-Dashboard unter 'System' Deine
+     MQTT-Broker-Zugangsdaten eintragen und Geräte anlernen.
+     =================================================================
+     ```
 
-Das Skript führt interaktiv durch die Schritte:
-- Erkennt automatisch den COM-Port des Pico W.
-- Fragt nach WLAN-SSID und Passwort und speichert sie in `config.json`.
-- Komprimiert das Web-Dashboard mit `gzip` (`index.html.gz`).
-- Überträgt alle benötigten Dateien und Bibliotheken per `mpremote`.
-- Startet den Pico W neu und meldet die direkte IP-Adresse für den Browser.
+#### Schritt 3: MQTT & Smart Home Konfiguration im Web-Dashboard
+1. Öffne die im Installer angezeigte IP-Adresse im Webbrowser.
+2. Wechsle auf den Tab **"System"** $\rightarrow$ **"📡 MQTT-Broker & HF-Einstellungen"**.
+3. Trage die IP-Adresse Deines MQTT-Brokers (z. B. Mosquitto auf Home Assistant oder FHEM) sowie Port, optional Benutzer und Passwort ein.
+4. Klicke auf **"💾 MQTT-Einstellungen speichern & neu verbinden"**. Der Pico speichert die Daten in `config.json` und verbindet sich ohne Neustart sofort mit dem Broker.
 
 ---
 
