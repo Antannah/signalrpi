@@ -1232,7 +1232,14 @@ function openReassign(proto, id, ch){
   pendingReassign = {proto: proto, new_id: id, channel: ch?parseInt(ch):null};
   document.getElementById('modal-info').innerHTML = `Neues Signal: <b>${proto}</b> | Neue Funk-ID: <code>${id}</code> ${ch?'(Kanal '+ch+')':''}`;
   let sel = document.getElementById('modal-select');
-  sel.innerHTML = knownDevices.map(d=>`<option value="${d.id}">${d.name} (${d.id})</option>`).join('');
+  // Bevorzuge Geräte mit demselben Protokoll (z.B. TCM97001), Fallback auf alle
+  let candidates = (knownDevices || []).filter(d => d.protocol === proto);
+  if(!candidates.length) candidates = (knownDevices || []);
+  if(candidates.length === 0){
+    sel.innerHTML = '<option value="">Keine bestehenden Geräte vorhanden</option>';
+  } else {
+    sel.innerHTML = candidates.map(d=>`<option value="${d.id}">${d.name} (${d.id}) [Ch: ${d.channel||'-'}]</option>`).join('');
+  }
   document.getElementById('reassign-modal').style.display = 'flex';
 }
 
