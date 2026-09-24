@@ -174,6 +174,48 @@ Die Topics sind hierarchisch aufgebaut, um eine einfache Filterung im MQTT-Broke
 }
 ```
 
+#### 4. Integration in FHEM (via MQTT2)
+
+FHEM-Benutzer können SignalRPI über das moderne `MQTT2`-Subsystem anbinden. Da SignalRPI standardisierte JSON-Payloads und native Status-Topics verwendet, ist kein eigener SignalDUINO-USB-Stick mehr am FHEM-Host nötig.
+
+##### A. Broker-Verbindung herstellen (FHEM)
+Falls FHEM noch nicht mit dem Mosquitto-Broker verbunden ist:
+```perl
+define myBroker MQTT2_CLIENT 192.168.125.4:1883
+attr myBroker clientId fhem_signalrpi
+attr myBroker keepalive 60
+attr myBroker autocreate simple
+```
+
+##### B. Eingerichteten Sensor einbinden (`MQTT2_DEVICE`)
+SignalRPI sendet Sensordaten zyklisch auf `signalrpi/devices/<ha_id>/state`. Über die FHEM-Funktion `json2nameValue($EVENT)` werden die JSON-Attribute automatisch in diskrete FHEM-Readings zerlegt:
+```perl
+define Blumentopf MQTT2_DEVICE
+attr Blumentopf IODev myBroker
+attr Blumentopf readingList signalrpi/devices/blumentopf/state:.* { json2nameValue($EVENT) }
+attr Blumentopf stateFormat Feuchte: moisture % | Bat: battery_voltage V | RSSI: rssi dBm
+```
+*Erzeugte FHEM-Readings:* `moisture`, `battery_voltage`, `battery_low`, `adc`, `rssi`.
+
+##### C. Schaltaktoren einbinden (Zwei-Wege-Steuerung für Licht & Steckdosen)
+Für bidirektionales Schalten (Senden von Befehlen an den Pico W via `set` und automatisches Feedback via `state`):
+```perl
+define Tischlampe MQTT2_DEVICE
+attr Tischlampe IODev myBroker
+attr Tischlampe readingList signalrpi/devices/tischlampe/state:.* state
+attr Tischlampe setList on:noArg signalrpi/devices/tischlampe/set ON\
+                       off:noArg signalrpi/devices/tischlampe/set OFF
+attr Tischlampe devStateIcon ON:on:off OFF:off:on
+```
+
+##### D. Wildcard-Lauschen auf alle Funktelegramme (SignalDUINO Roh-Ebene)
+Um alle empfangenen Funktelegramme ohne manuelle Konfiguration im Web-Dashboard direkt in FHEM mitzuschneiden:
+```perl
+define AutoSensoren MQTT2_DEVICE
+attr AutoSensoren IODev myBroker
+attr AutoSensoren readingList signalrpi/messages/([^/]+)/([^/]+):.* { json2nameValue($EVENT, "$1_$2_") }
+```
+
 ---
 
 ## 4. Software-Laufzeitumgebung (Entscheidung: MicroPython)
