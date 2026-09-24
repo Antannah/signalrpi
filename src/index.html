@@ -685,6 +685,7 @@ async function changeDeviceProfile(id, profile){
   try{
     await fetch('/api/devices/profile', {
       method: 'POST',
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({id: id, profile: profile})
     });
     refreshDevices();

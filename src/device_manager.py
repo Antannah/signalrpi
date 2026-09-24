@@ -205,7 +205,7 @@ class DeviceManager:
         for dev in self.devices:
             if dev.get("enabled", True):
                 self.publish_discovery(dev)
-                time.sleep_ms(40)
+                time.sleep_ms(80)
 
     def publish_discovery(self, dev):
         if not self.mqtt_client or not dev.get("enabled", True):
@@ -213,7 +213,12 @@ class DeviceManager:
             
         dev_id = dev["id"]
         dev_name = dev.get("name", dev_id)
-        dev_type = dev.get("type", "sensor")
+        # Profil hat Vorrang für Schalter/Licht-Klassifizierung
+        dev_profile = dev.get("profile")
+        if dev_profile in ["light", "switch"]:
+            dev_type = dev_profile
+        else:
+            dev_type = dev.get("type", "sensor")
         
         device_info = {
             "identifiers": ["signalrpi_" + dev_id],
@@ -228,7 +233,16 @@ class DeviceManager:
                                  "pressure", "power", "current", "voltage", "energy", "moisture"}
         import time
         if dev_type == "sensor":
-            entities = dev.get("entities", [])
+            entities = list(dev.get("entities", []))
+            # Falls RSSI noch nicht in den Entitäten definiert ist, automatisch ergänzen
+            if not any(e.get("key") == "rssi" for e in entities):
+                entities.append({
+                    "key": "rssi",
+                    "name": "Signalstärke",
+                    "unit": "dBm",
+                    "device_class": "signal_strength",
+                    "icon": "mdi:signal"
+                })
             for ent in entities:
                 key = ent["key"]
                 lbl = ent.get("name") or key
@@ -256,14 +270,11 @@ class DeviceManager:
                     
                 try:
                     self.mqtt_client.publish(disc_topic, json.dumps(payload).encode('utf-8'), retain=True)
-                    time.sleep_ms(25)
+                    time.sleep_ms(50)
+                except OSError:
+                    raise
                 except Exception as e:
                     print("HA Discovery Fehler:", e)
-                    try:
-                        self.mqtt_client.connect()
-                        self.mqtt_client.publish(disc_topic, json.dumps(payload).encode('utf-8'), retain=True)
-                    except Exception:
-                        pass
                     
         elif dev_type in ["switch", "light"]:
             # 1. Altes komplementäres Topic löschen (verhindert switch+light Duplikat in HA)
@@ -272,7 +283,9 @@ class DeviceManager:
                 self.mqtt_client.publish(
                     "homeassistant/{}/signalrpi_{}/config".format(other, dev_id),
                     "", retain=True)
-                time.sleep_ms(25)
+                time.sleep_ms(50)
+            except OSError:
+                raise
             except Exception:
                 pass
 
@@ -293,7 +306,9 @@ class DeviceManager:
                 payload["icon"] = dev["icon"]
             try:
                 self.mqtt_client.publish(disc_topic, json.dumps(payload).encode('utf-8'), retain=True)
-                time.sleep_ms(25)
+                time.sleep_ms(50)
+            except OSError:
+                raise
             except Exception as e:
                 print("HA Discovery Fehler ({}):".format(component), e)
 
@@ -312,10 +327,13 @@ class DeviceManager:
             }
             try:
                 self.mqtt_client.publish(rep_topic, json.dumps(rep_payload), retain=True)
-                time.sleep_ms(25)
+                time.sleep_ms(50)
                 # Aktuellen Repetitions-Wert publishen
                 curr_rep = dev.get("repetitions", 6)
                 self.mqtt_client.publish("signalrpi/devices/{}/repetitions/state".format(dev_id), str(curr_rep), retain=True)
+                time.sleep_ms(50)
+            except OSError:
+                raise
             except Exception as e:
                 print("HA Discovery Fehler (Repetitions):", e)
 

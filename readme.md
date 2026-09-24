@@ -224,9 +224,40 @@ graph TD
 
 Dieses Kapitel beschreibt, wie neue Software auf den Pico W übertragen wird und wie das Test-Setup (sowohl Hardware als auch Software-Simulation) aufgebaut ist.
 
-### 6.1 Code-Deployment (Flashen der Skripte)
+### 6.1 Code-Deployment & Dateistruktur
 
 Die Skripte im Verzeichnis `src/` werden direkt auf das Flash-Dateisystem des Raspberry Pi Pico W übertragen.
+
+```text
+/ (Pico Flash Root)
+├── boot.py               # WLAN-Start vor main.py
+├── config_local.py       # WLAN- & MQTT-Zugangsdaten, Pins, Betriebsmodus
+├── main.py               # Hauptprogramm: Kooperative Schleife (Radio, MQTT, Web)
+├── cc1101.py             # Low-Level SPI-Treiber für CC1101
+├── pio_receiver.py       # PIO-State-Machine für $\mu$s-genaue OOK-Flankenerfassung
+├── device_manager.py     # Geräteverwaltung, Profil-Zuweisung & HA Auto-Discovery
+├── devices.json          # Persistente Konfiguration der registrierten Funkgeräte
+├── web_server.py         # Asynchroner Webserver (REST-API & Sniffer-Stream)
+├── index.html            # Web-Dashboard (Single Page App)
+├── static_html.py        # Komprimierte/Inline-Auslieferung für Webserver
+├── time_sync.py          # NTP-Zeitsynchronisation
+├── ota_updater.py        # GitHub-OTA Update-Mechanismus
+├── en_decoders/          # Protokoll-Decoder und Encoder
+│   ├── __init__.py       # Decoder-Registry und Dispatcher
+│   ├── base.py           # Abstrakte Decoder-Basisklasse
+│   ├── intertechno.py    # Intertechno V1 & V3 Decoder
+│   ├── it_encoder.py     # OOK-Pulsgenerierung für Intertechno V1 / V3 TX
+│   ├── pattern_decoder.py# Generischer Pattern-Decoder (Manchester, PPM etc.)
+│   ├── sd_ws07.py        # Eurochron / TFA Wetterstationen
+│   ├── sd_ws_fsk.py      # FSK-Wetterstationen (868 MHz)
+│   ├── sd_ws_ook.py      # OOK-Wetterstationen
+│   └── tcm97001.py       # TCM / Tchibo / GT-WT-02 Sensoren
+└── lib/
+    ├── ssl.mpy           # MicroPython SSL-Unterstützung
+    └── umqtt/
+        ├── simple.py     # Robuster MQTT-Client mit Keepalive und Ping
+        └── simple.mpy    # Kompiliertes Bytecode-Modul
+```
 
 *   **VS Code + "MicroPico"-Extension (Empfohlen):**
     1. Pico W per USB-Kabel mit dem PC verbinden.
@@ -236,8 +267,9 @@ Die Skripte im Verzeichnis `src/` werden direkt auf das Flash-Dateisystem des Ra
     *   Installation via `pip install mpremote`.
     *   Dateien hochladen:
         ```bash
-        mremote fs cp src/main.py :main.py
-        mremote fs cp -r src/en_decoders :en_decoders
+        mpremote fs cp src/main.py :main.py
+        mpremote fs cp src/device_manager.py :device_manager.py
+        mpremote fs cp -r src/en_decoders :en_decoders
         ```
     *   Konsole öffnen: `mpremote repl`
 

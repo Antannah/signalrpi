@@ -37,11 +37,14 @@ class WebServer:
             content_len = 0
             while True:
                 h = await asyncio.wait_for(reader.readline(), 3.0)
-                if not h or h == b"\r\n":
+                if not h or h in (b"\r\n", b"\n", b""):
                     break
-                h_str = h.decode("utf-8").lower()
+                h_str = h.decode("utf-8").lower().strip()
                 if h_str.startswith("content-length:"):
-                    content_len = int(h_str.split(":")[1].strip())
+                    try:
+                        content_len = int(h_str.split(":")[1].strip())
+                    except Exception:
+                        pass
 
             # Routing
             if url == "/" or url.startswith("/index"):
@@ -140,11 +143,14 @@ class WebServer:
                     data = json.loads(body.decode("utf-8"))
                     ha_id = data.get("id")
                     profile = data.get("profile")
+                    print("[Profile API] id:", ha_id, "profile:", profile)
                     if ha_id and profile and self.device_manager.set_device_profile(ha_id, profile):
                         writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}")
                     else:
+                        print("[Profile API] Nicht gefunden oder set_device_profile fehlgeschlagen")
                         writer.write(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
-                except Exception:
+                except Exception as ex:
+                    print("[Profile API] Exception:", ex)
                     writer.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
 
             elif url.startswith("/api/devices"):
