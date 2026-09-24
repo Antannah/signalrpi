@@ -190,9 +190,16 @@ if has_config:
             print("[MQTT IN] Topic:", t_str, "Payload:", m_str)
             
             if t_str == "signalrpi/system/ota_update":
-                print("MQTT OTA Update Befehl empfangen!")
+                branch = m_str if m_str and not m_str.startswith("{") else "main"
+                if m_str.startswith("{"):
+                    try:
+                        b_data = json.loads(m_str)
+                        branch = b_data.get("branch", "main")
+                    except Exception:
+                        pass
+                print("MQTT OTA Update Befehl empfangen für Branch:", branch)
                 import ota_updater
-                ota_updater.update_from_github()
+                ota_updater.update_from_github(branch=branch)
                 
             elif t_str.startswith("signalrpi/devices/") and t_str.endswith("/set"):
                 # Format: signalrpi/devices/<ha_id>/set

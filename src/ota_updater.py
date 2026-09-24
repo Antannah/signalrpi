@@ -4,7 +4,7 @@ import os
 import machine
 import gc
 
-GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Antannah/signalrpi/main"
+GITHUB_RAW_TEMPLATE = "https://raw.githubusercontent.com/Antannah/signalrpi/{}"
 
 # Liste der Kernkomponenten, die aktualisiert werden
 FILES_TO_UPDATE = [
@@ -28,19 +28,20 @@ FILES_TO_UPDATE = [
     "src/en_decoders/sd_ws_fsk.py"
 ]
 
-def update_from_github(callback=None):
+def update_from_github(branch="main", callback=None):
     """
     Lädt alle Kern-Dateien von GitHub herunter und speichert sie im Flash.
     Führt anschließend einen Warmstart des Pico W durch.
     """
     success_count = 0
     errors = []
+    base_url = GITHUB_RAW_TEMPLATE.format(branch)
 
     for file_path in FILES_TO_UPDATE:
         # Lokaler Zielpfad: z. B. 'src/main.py' -> 'main.py'
         local_name = file_path.replace("src/", "")
         
-        url = "{}/{}".format(GITHUB_RAW_BASE, file_path)
+        url = "{}/{}".format(base_url, file_path)
         if callback:
             callback("Downloading {}...".format(local_name))
         print("OTA: Lade", url)
