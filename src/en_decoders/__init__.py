@@ -33,18 +33,15 @@ def decode_ook_signal(pulse_width_sequence: list) -> dict | None:
     except Exception as e:
         print("Musterdecoder Fehler:", e)
 
+    if not pattern:
+        return None
+
     # 2. Pipeline der Protokoll-Decoder durchlaufen
     for decoder in DECODERS_OOK:
         try:
-            # Decoder bevorzugt mit voranalysiertem Pattern aufrufen, Fallback auf Rohfolge
-            result = None
-            if pattern:
-                result = decoder.decode(pattern)
-            if not result:
-                result = decoder.decode(pulse_width_sequence)
-                
+            result = decoder.decode(pattern)
             if result:
-                if pattern and "ms_string" not in result:
+                if "ms_string" not in result:
                     result["ms_string"] = pattern.to_ms_string()
                 return result
         except Exception as e:

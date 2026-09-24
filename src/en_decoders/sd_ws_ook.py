@@ -19,24 +19,14 @@ class DecoderWSOOK(BaseDecoder):
         oder bereits ein voranalysiertes SignalPattern.
         """
         pattern: SignalPattern | None = None
-        raw_pulses = None
 
         if isinstance(signal, SignalPattern):
             pattern = signal
-            raw_pulses = signal.raw_pulses
         elif isinstance(signal, list):
-            raw_pulses = signal
             pattern = PatternDecoder.decode_pattern(signal)
 
-        # 1. Bevorzugt über diskret quantisierte Vielfache (Mustererkennung)
         if pattern and 300 <= pattern.clock <= 750 and len(pattern.multiples) >= 40:
-            res = self._decode_pattern(pattern)
-            if res:
-                return res
-
-        # 2. Fallback auf rohe Mikrosekunden-Folge
-        if raw_pulses and len(raw_pulses) >= 40:
-            return self._decode_raw(raw_pulses)
+            return self._decode_pattern(pattern)
 
         return None
 
@@ -77,27 +67,6 @@ class DecoderWSOOK(BaseDecoder):
             return None
 
         return self._parse_bits(bits[:48], pattern.clock)
-
-    def _decode_raw(self, pulses: list[int]) -> dict | None:
-        """
-        Traditionelle Zeitschwellen-Dekodierung als Fallback.
-        """
-        bits = []
-        for i in range(0, len(pulses) - 1, 2):
-            high = pulses[i]
-            low = pulses[i+1]
-            
-            is_last_pulse = (i == len(pulses) - 2)
-            if 600 <= low <= 1500 or (is_last_pulse and low >= 1500):
-                if 1100 <= high <= 1900:
-                    bits.append(0)
-                elif 250 <= high <= 850:
-                    bits.append(1)
-                    
-        if len(bits) < 48:
-            return None
-            
-        return self._parse_bits(bits[:48])
 
     def _parse_bits(self, bits: list[int], clock: int | None = None) -> dict | None:
         """

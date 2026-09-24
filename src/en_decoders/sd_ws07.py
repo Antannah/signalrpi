@@ -31,24 +31,14 @@ class DecoderWS07(BaseDecoder):
         oder bereits ein voranalysiertes SignalPattern.
         """
         pattern: SignalPattern | None = None
-        raw_pulses = None
 
         if isinstance(signal, SignalPattern):
             pattern = signal
-            raw_pulses = signal.raw_pulses
         elif isinstance(signal, list):
-            raw_pulses = signal
             pattern = PatternDecoder.decode_pattern(signal)
 
-        # 1. Bevorzugt über diskret quantisierte Vielfache (Mustererkennung)
         if pattern and 300 <= pattern.clock <= 700 and len(pattern.multiples) >= 20:
-            res = self._decode_pattern(pattern)
-            if res:
-                return res
-
-        # 2. Fallback auf rohe Mikrosekunden-Folge
-        if raw_pulses and len(raw_pulses) >= 20:
-            return self._decode_raw(raw_pulses)
+            return self._decode_pattern(pattern)
 
         return None
 
@@ -93,46 +83,6 @@ class DecoderWS07(BaseDecoder):
             return None
 
         return self._parse_bits(bits, pattern.clock)
-
-    def _decode_raw(self, pulses: list[int]) -> dict | None:
-        """
-        Traditionelle Zeitschwellen-Dekodierung als Fallback.
-        High: 300..700 µs
-        Low 0: 700..1500 µs
-        Low 1: 1600..2600 µs
-        """
-        bits = []
-        i = 0
-        while i < len(pulses) - 1:
-            high = pulses[i]
-            low = pulses[i+1]
-
-            if 250 <= high <= 750:
-                if 650 <= low <= 1500:
-                    bits.append(0)
-                    i += 2
-                    continue
-                elif 1550 <= low <= 2800:
-                    bits.append(1)
-                    i += 2
-                    continue
-                elif low > 3000:
-                    if len(bits) >= 32:
-                        break
-                    bits = []
-                    i += 2
-                    continue
-
-            if len(bits) < 32:
-                bits = []
-            elif len(bits) >= 32:
-                break
-            i += 1
-
-        if len(bits) < 32:
-            return None
-
-        return self._parse_bits(bits)
 
     def _parse_bits(self, bits: list[int], clock: int | None = None) -> dict | None:
         """
