@@ -43,6 +43,7 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
 <div class="header">
   <div class="brand">📻 signalrpi Gateway</div>
   <div style="display:flex;align-items:center;gap:8px">
+    <div class="pill" id="badge-branch" style="background:rgba(255,255,255,0.05);color:var(--text-dim)">v...</div>
     <div class="pill" id="badge-cc433" style="background:rgba(255,255,255,0.05);color:var(--text-dim)">433 MHz: ...</div>
     <div class="pill" id="badge-cc868" style="background:rgba(255,255,255,0.05);color:var(--text-dim)">868 MHz: ...</div>
     <div class="pill" id="sys-status">WLAN</div>
@@ -272,8 +273,18 @@ body{background:var(--bg);color:var(--text);padding:1rem;min-height:100vh}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem">
       <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);padding:1rem;border-radius:10px">
         <h4 style="color:var(--accent);margin-bottom:8px">1. GitHub OTA Update</h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">Lädt den neuesten Stand des Haupt-Branches von GitHub herunter und startet neu.</p>
-        <button class="btn" onclick="triggerGitHubOTA()" id="btn-ota">Jetzt von GitHub aktualisieren</button>
+        <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px" id="ota-current-info">
+          Version: <b id="s-ver-val" style="color:var(--text)">...</b> | Branch: <b id="s-branch-val" style="color:var(--accent)">...</b>
+        </div>
+        <label style="font-size:0.75rem;color:var(--text-dim)">Ziel-Branch:</label>
+        <div style="display:flex;gap:6px;margin:4px 0 10px">
+          <input id="ota-branch-input" class="form-input" style="margin:0;padding:6px;font-size:0.8rem;flex:1" value="main" placeholder="z.B. main oder feature-xyz">
+          <select class="form-input" style="width:auto;margin:0;padding:6px;font-size:0.8rem" onchange="document.getElementById('ota-branch-input').value=this.value">
+            <option value="main">main</option>
+            <option value="feature-ms-pattern">feature-ms-pattern</option>
+          </select>
+        </div>
+        <button class="btn" onclick="triggerGitHubOTA()" id="btn-ota" style="width:100%">🚀 Update starten</button>
         <div id="ota-status" style="font-size:0.8rem;margin-top:8px;color:var(--amber)"></div>
       </div>
 
@@ -759,6 +770,36 @@ async function updateSystem(){
     document.getElementById('s-ip').innerText = s.ip;
     document.getElementById('s-rssi').innerText = s.wifi_rssi+' dBm';
     document.getElementById('s-ram').innerText = Math.round(s.free_ram/1024)+' kB';
+
+    // 0. Version & Branch Anzeige
+    let curVer = s.version || '1.2.0';
+    let curBranch = s.branch || 'main';
+    let bBranch = document.getElementById('badge-branch');
+    if(bBranch){
+      if(curBranch === 'main'){
+        bBranch.innerText = 'v' + curVer;
+        bBranch.style.background = 'rgba(255,255,255,0.06)';
+        bBranch.style.color = 'var(--text-dim)';
+        bBranch.title = 'Hauptversion auf main';
+      } else {
+        bBranch.innerText = '🌿 ' + curBranch;
+        bBranch.style.background = 'rgba(245,158,11,0.25)';
+        bBranch.style.color = 'var(--amber)';
+        bBranch.title = 'Test-Branch: ' + curBranch;
+      }
+    }
+    let svv = document.getElementById('s-ver-val');
+    if(svv) svv.innerText = 'v' + curVer;
+    let sbv = document.getElementById('s-branch-val');
+    if(sbv){
+      sbv.innerText = curBranch;
+      sbv.style.color = (curBranch === 'main') ? 'var(--accent)' : 'var(--amber)';
+    }
+    let otaInp = document.getElementById('ota-branch-input');
+    if(otaInp && !otaInp.dataset.userEdited){
+      otaInp.value = curBranch;
+      otaInp.dataset.userEdited = '1';
+    }
     
     // 1. Modul 1 (433 MHz) Status
     let b4 = document.getElementById('badge-cc433');
@@ -1455,15 +1496,20 @@ async function saveITDevice(){
 }
 
 async function triggerGitHubOTA(){
-  if(!confirm('GitHub OTA Update jetzt starten? Der Pico lädt die Dateien herunter und startet neu.')) return;
+  let branch = (document.getElementById('ota-branch-input') ? document.getElementById('ota-branch-input').value.trim() : '') || 'main';
+  if(!confirm('GitHub OTA Update von Branch "' + branch + '" jetzt starten? Der Pico lädt die Dateien herunter und startet neu.')) return;
   let btn = document.getElementById('btn-ota');
   let st = document.getElementById('ota-status');
   btn.disabled = true;
-  st.innerText = 'OTA Download läuft... Bitte ca. 10 Sekunden warten.';
+  st.innerText = 'OTA Download von "' + branch + '" läuft... Bitte ca. 15 Sekunden warten.';
   try{
-    await fetch('/api/ota', {method:'POST'});
-    st.innerText = 'Pico startet neu... Verbinde in 5s neu...';
-    setTimeout(()=>{ location.reload(); }, 6000);
+    await fetch('/api/ota', {
+      method:'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({branch: branch})
+    });
+    st.innerText = 'Pico startet neu... Verbinde in 6s neu...';
+    setTimeout(()=>{ location.reload(); }, 6500);
   }catch(e){
     st.innerText = 'Fehler beim Auslösen des OTA Updates.';
     btn.disabled = false;

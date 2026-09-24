@@ -28,6 +28,42 @@ FILES_TO_UPDATE = [
     "src/en_decoders/sd_ws_fsk.py"
 ]
 
+VERSION = "1.2.0"
+
+def get_version_info():
+    """
+    Liest den aktuellen Versions- und Branch-Stand aus version.json.
+    """
+    info = {
+        "version": VERSION,
+        "branch": "main",
+        "updated_at": "-"
+    }
+    try:
+        import json
+        with open("version.json", "r") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                info.update(data)
+    except Exception:
+        pass
+    return info
+
+def save_version_info(branch):
+    try:
+        import json, time
+        t = time.localtime()
+        dt_str = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}".format(t[0], t[1], t[2], t[3], t[4])
+        info = {
+            "version": VERSION,
+            "branch": str(branch),
+            "updated_at": dt_str
+        }
+        with open("version.json", "w") as f:
+            json.dump(info, f)
+    except Exception as ex:
+        print("Fehler beim Speichern von version.json:", ex)
+
 def update_from_github(branch="main", callback=None):
     """
     Lädt alle Kern-Dateien von GitHub herunter und speichert sie im Flash.
@@ -76,6 +112,7 @@ def update_from_github(branch="main", callback=None):
             print("OTA Exception:", err_msg)
 
     if success_count > 0:
+        save_version_info(branch)
         print("OTA Update abgeschlossen: {} Dateien aktualisiert. Starte neu...".format(success_count))
         if callback:
             callback("Update fertig ({} Dateien). Neustart in 2s...".format(success_count))
